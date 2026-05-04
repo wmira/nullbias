@@ -1,0 +1,129 @@
+strategy_id: raschke_80_20_v1
+name: "80-20 Pattern — Day-After Range-Extreme Close Reversal"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts"
+  chapter_or_url: "80-20 chapter; with Larry Connors"
+  publication_year: 1995
+  page_or_section: "80-20s chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: range_extreme_close_reversal
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid daily-chart instruments"
+timeframe: daily
+holding_period_typical: "1-3 days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid stocks, futures, ETFs"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Setup at bar t:
+
+    LONG setup (downside-extreme reversal):
+    1. open(t) ≥ high(t) - 0.20 × (high(t) - low(t))
+       (today opened in the TOP 20% of the day's range)
+    2. close(t) ≤ low(t) + 0.20 × (high(t) - low(t))
+       (today CLOSED in the BOTTOM 20% of the day's range)
+    3. So: opened high, closed low — strong reversal day
+
+    Execution at bar t+1:
+    4. Place buy stop at: low(t) + 5-15 ticks (just above today's low)
+    5. Wait for next bar to trade BELOW today's low FIRST, then reverse
+       and break the buy-stop level
+    6. Order valid for 1 day; fill only if intraday low(t+1) < low(t)
+       AND intraday high(t+1) ≥ buy_stop
+
+    SHORT setup — symmetric:
+    1. open(t) in BOTTOM 20% of range
+    2. close(t) in TOP 80% of range
+    3. Sell-stop at high(t) - buffer; trigger requires next-day high to
+       exceed today's high then reverse down through stop
+  indicators_used:
+    - name: bar_range_position
+      lookback_period: 1
+      formula_reference: "(close - low) / (high - low) for close position; same for open. Ratio thresholds 0.2 and 0.8."
+      applied_to: high_low_open_close
+  entry_price: stop_above_prior_low_or_below_prior_high
+  entry_time: "Day t+1 intraday — only after price first breaks today's range extreme then reverses"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position = (equity × 1%) / stop distance"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Prior session's open or close"
+  stop_loss: "Beyond today's intraday low (long) or high (short)"
+  time_stop: "Exit by close of t+2 if not stopped or at target"
+  trailing_stop: NOT_SPECIFIED
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Stop → time stop → target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "1 bar"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps; intraday slippage on stop fills"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995"
+  test_universe: "Futures, stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author claims 80-90% follow-through; ~50% of those continue to mid-day reversal"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — full setup is rare"
+  notes: "Pattern is rare but high probability when it triggers. Day trader's setup; modern markets may have different intraday dynamics."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "70-30 (less strict cutoff)"
+  - "Apply on 60-min instead of daily"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Top 20% / bottom 20%' of day's range is the canonical version.
+    Strict cutoff sometimes produces no signals for weeks.
+  - The two-step trigger (price must first violate the prior bar's range
+    extreme, then reverse to fill the entry stop) is what makes this
+    high-probability — not just buying a strong reversal day.
+look_ahead_bias_warnings: "Multi-step intraday trigger requires intraday data for accurate backtesting; daily-only OHLC will overstate fill rate."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Threshold values heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_turtle_soup_long_v1
+  - chan_overnight_gap_momentum_v1
+prerequisites: None

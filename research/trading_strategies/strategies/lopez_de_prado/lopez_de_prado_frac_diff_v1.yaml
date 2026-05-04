@@ -1,0 +1,148 @@
+strategy_id: lopez_de_prado_frac_diff_v1
+name: "Fractional Differentiation Feature Engineering"
+author: Marcos López de Prado
+
+source:
+  type: book
+  title: "Advances in Financial Machine Learning"
+  chapter_or_url: "Chapter 5 (Fractionally Differentiated Features)"
+  publication_year: 2018
+  page_or_section: "Chapter 5"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: ml_feature_engineering_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any time series — feature engineering overlay"
+timeframe: daily
+holding_period_typical: "N/A — feature engineering"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying ML strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Feature engineering technique. Replaces integer differentiation
+    (returns, log returns) which DESTROYS price-level memory, with
+    fractional differentiation that preserves more memory while
+    achieving stationarity.
+
+    Method (Fixed-Width Window form, FFD):
+
+    1. Choose differencing parameter d ∈ (0, 1):
+       d = 0   →  raw price (full memory, non-stationary)
+       d = 1   →  first difference / return (no memory, stationary)
+       d = 0.4 →  some memory + stationary (typical sweet spot)
+
+    2. Compute weights:
+         w_0 = 1
+         w_k = -w_{k-1} × (d - k + 1) / k    (recursive)
+       Truncate when |w_k| < tolerance (e.g., 1e-5)
+
+    3. Apply weighted convolution:
+         frac_diff[t] = sum over k from 0 to K of w_k × series[t-k]
+
+    4. Test stationarity (ADF test):
+         If p-value < 0.05: stationary, use this d
+         Else: increase d slightly, retry
+       Find the SMALLEST d such that the series is stationary
+       (preserves maximum memory).
+
+    5. Use frac_diff[t] as ML feature (instead of raw price or return).
+  indicators_used:
+    - name: fractional_differentiation
+      lookback_period: "Truncated when weights drop below threshold"
+      formula_reference: |
+        Recursive weights w_k computed as above; convolution applied
+        over rolling window. Implementations:
+        - mlfinlab.features.fracdiff
+        - tsfracdiff Python package
+        - Custom implementation per book Chapter 5
+      applied_to: "log price or raw price"
+    - name: ADF_test
+      lookback_period: "Full frac_diff series"
+      formula_reference: "Augmented Dickey-Fuller test for stationarity"
+      applied_to: "frac_diff series"
+  entry_price: per_underlying_strategy
+  entry_time: per_underlying_strategy
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Feature engineering doesn't size positions"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "Several hundred bars for stable d estimation"
+  benchmark: "ML strategy with simple returns as input"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Demonstrated in book Chapter 5"
+  test_universe: "Various futures and equity indexes"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Author finds optimal d typically < 0.5 (often ~0.4) for daily
+    equity index series — preserves substantial memory while
+    achieving stationarity. ADF stat reaches 95% critical value at
+    d ~ 0.2 and correlation with original > 90%.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Expanding-window form (uses all history; slower)"
+  - "Adaptive d (re-estimate periodically)"
+  - "Apply on log-prices vs raw-prices"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Threshold for weight truncation: 1e-4 to 1e-5 typical; affects
+    window size.
+  - 'Optimal d' is the smallest d producing ADF p < 0.05; use binary
+    search on (0, 1).
+look_ahead_bias_warnings: "FFD weights are causal — use only past observations."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "d is data-driven; use OOS validation."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - lopez_de_prado_meta_labeling_v1
+  - chan_variance_ratio_filter_v1
+prerequisites: "ML strategy with feature inputs"

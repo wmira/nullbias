@@ -1,0 +1,152 @@
+strategy_id: gray_quant_momentum_v1
+name: "Quantitative Momentum (Full Screen)"
+author: Wesley Gray (with Jack Vogel)
+
+source:
+  type: book
+  title: "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System"
+  chapter_or_url: "Multiple chapters; alphaarchitect.com 'Quantitative Momentum Investing Philosophy' page"
+  publication_year: 2016
+  page_or_section: "Full process across the book"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: equity_smooth_momentum
+asset_class: [equities]
+specific_instruments: "US large- and mid-cap stocks"
+timeframe: quarterly
+holding_period_typical: "3 months (quarterly rebalance)"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - Listed on NYSE/AMEX/NASDAQ
+  - Market cap above 40th percentile of NYSE breakpoint
+  - close > $5
+  - Excluding financials and utilities (book convention)
+liquidity_filter: "Mid-cap or larger"
+fundamental_filter: "Excludes financials and utilities"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Quarterly screening process. Multi-step funnel:
+
+    Step 1 — Generic momentum:
+      Compute 12-2 momentum: total return from t-252 to t-21 (skip last
+      month to avoid 1-month reversal).
+      Keep stocks in the top decile by 12-2 momentum.
+
+    Step 2 — Frog-in-the-Pan (FIP) quality filter:
+      For each top-decile stock, compute over the last 252 trading days
+      (12 months):
+        FIP_score = sign(12_2_return) × ((days_negative - days_positive) / 252)
+      where days_positive and days_negative count daily returns > 0 and < 0.
+      Sort the top decile by FIP_score ASCENDING (most-negative is
+      "smoothest" — many small steady gains rather than big jumps).
+
+    Step 3 — Final selection:
+      Take the top 50 names from Step 2 (smoothest momentum).
+      Equal-weighted.
+
+    Step 4 — Seasonality (optional):
+      Per book: rebalance Feb / May / Aug / Nov to capture the
+      seasonality of momentum.
+  indicators_used:
+    - name: ROC_12_2
+      lookback_period: "21 to 252 trading days"
+      formula_reference: "(close[t-21] / close[t-252]) - 1   (12-2 month momentum)"
+      applied_to: close
+    - name: FIP_score
+      lookback_period: 252
+      formula_reference: |
+        days_pos = count of daily returns > 0 over last 252 bars
+        days_neg = count of daily returns < 0 over last 252 bars
+        FIP = sign(ROC_12_2) × ((days_neg - days_pos) / 252)
+      applied_to: returns
+  entry_price: market_open_next_bar
+  entry_time: "First day of new quarter (Feb/May/Aug/Nov first trading day)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2   # 1/50
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 50
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Quarterly re-rank rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Optional cap; book does not enforce"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per stock for momentum + FIP"
+  benchmark: "S&P 500 / Russell 1000"
+  starting_capital: 100000
+  commission_assumption: "$0.005/share or $0 retail"
+  slippage_assumption: "10 bps for stocks"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1927-2014 in book"
+  test_universe: "US large+mid cap"
+  cagr: "Author reports ~15%+ CAGR for full QM vs ~10% for S&P 500 over the test period"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Material — momentum suffers severe drawdowns in trend reversals (1932, 2009)"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "FIP filter improves Sharpe by reducing exposure to news-driven momentum spikes. Performance attribution: 12-2 alone produces ~13%; FIP adds ~2% additional CAGR."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop FIP filter (becomes pure 12-2 momentum decile)"
+  - "Top 100 names instead of 50 (more diversified, slightly lower momentum intensity)"
+  - "Monthly rebalance instead of quarterly"
+  - "Apply to international universe (becomes IMOM — see gray_intl_quant_momentum_v1)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 12-2 lookback: 252 trading days back to 21 trading days back. Some
+    implementations use calendar months (12 calendar months from 1
+    calendar month ago).
+  - FIP sign convention: stocks with up-trends should have many small
+    up-days (FIP_score should be more negative when trend is steady-up).
+    The formula ensures lower FIP = smoother trend.
+  - Quarterly rebalance: book recommends Feb/May/Aug/Nov to capture
+    the seasonality finding (December momentum is weaker due to
+    tax-loss selling; momentum strongest after Jan).
+look_ahead_bias_warnings: "Use lagged returns (close at end of trading day) for ranking; fill at next-day open."
+survivorship_bias_warnings: "Material — must use point-in-time membership."
+data_snooping_warnings: |
+  - 12-2, top 50, FIP all heuristic choices. Multi-decade backtest gives
+    some confidence but parameters are not optimised on each window.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_qmom_etf_v1
+  - gray_intl_quant_momentum_v1
+  - clenow_stocks_on_the_move_v1
+  - alvarez_monthly_sp500_rotation_ranking_v1
+prerequisites: None

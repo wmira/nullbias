@@ -1,0 +1,132 @@
+# =============================================================================
+# Connors VIX RSI — buy SPY when VIX is panicked (RSI of VIX extended)
+# =============================================================================
+
+strategy_id: connors_vix_rsi_v1
+name: "VIX RSI Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "Short Term Trading Strategies That Work"
+  chapter_or_url: "VIX RSI chapter; with Cesar Alvarez"
+  publication_year: 2008
+  page_or_section: "VIX-based timing chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: volatility_spike_buy
+asset_class: [etfs]
+specific_instruments: "SPY (canonical demo); applies to other broad-index ETFs"
+timeframe: daily
+holding_period_typical: "2–8 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "SPY (or another broad-index ETF for which VIX is the natural volatility proxy)"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close_SPY(t) > SMA(close_SPY, 200) at bar t                # primary uptrend
+    2. RSI(close_SPY, 2) at bar t < 30                            # SPY itself is short-term oversold
+    3. RSI(close_VIX, 2) at bar t > 90                            # VIX is at panicked extreme
+    4. open_VIX(t) > close_VIX(t-1)                               # VIX gapped up at the open
+    5. No SPY position currently open
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: "close (SPY)"
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: "close (VIX)"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when RSI(close_SPY, 2) at bar t > 65"
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single exit"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter built into entry"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "SPY: open, high, low, close, volume"
+    - "VIX: open, close (high/low optional)"
+  data_frequency: daily
+  minimum_history_required: "200 bars of SPY history + ~30 bars of RSI(2) warmup on each series"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps MOC"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 1993–2008 (book era)"
+  test_universe: "SPY"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "High (book reports ~80%+) but small sample size"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — high signal selectivity due to multiple conditions"
+  notes: "Note that RSI(2) of VIX > 90 fires only on extreme volatility events."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop the SPY RSI(2)<30 condition — looser, more frequent"
+  - "Use SMA-based VIX premium (VIX > N% above 10-day SMA) instead of RSI(VIX,2)>90"
+  - "Add 'VIX has risen 3 days in a row' filter for stronger panic confirmation"
+  - "Substitute QQQ or IWM as the underlying (with RVX/VXN volatility proxy)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author refers to the VIX index as the volatility proxy. VIX itself is
+    not directly tradable; the strategy uses the VIX *level* as a signal
+    only and trades SPY.
+  - Condition (4) 'opens above yesterday's close' means today's VIX open
+    > prior VIX close, capturing intraday panic carry-over from prior session.
+  - VIX prices use the official CBOE close; some data providers round to
+    two decimals.
+look_ahead_bias_warnings: "Close-of-day signal on both series; both close prints must be available before fill."
+survivorship_bias_warnings: "Negligible (SPY)."
+data_snooping_warnings: "RSI(2)>90 on VIX is rare; conclusions from few trades have wide confidence intervals."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_cumulative_rsi_v1
+prerequisites: None

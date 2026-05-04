@@ -1,0 +1,156 @@
+strategy_id: bandy_health_check_overlay_v1
+name: "System Health Monitoring (Equity-Curve T-Test)"
+author: Howard Bandy
+
+source:
+  type: book
+  title: "Modeling Trading System Performance / Quantitative Technical Analysis"
+  chapter_or_url: "System health chapters"
+  publication_year: 2011
+  page_or_section: "Live monitoring chapters"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: live_monitoring_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying strategy in live trading"
+timeframe: daily
+holding_period_typical: "N/A — overlay"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY: continuously monitor a live strategy's performance to detect
+    when it has 'broken' (i.e., out-of-sample stops resembling in-sample).
+
+    Methods (Bandy's published checks, applied jointly):
+
+    A) WIN-RATE T-TEST:
+       Compare recent live win rate vs backtested win rate using a
+       statistical t-test (or chi-square for binomial proportions).
+       Threshold: if p-value < 0.05 against the null that they are equal,
+       flag the system as potentially broken.
+
+    B) STANDARD ERROR BANDS ON EQUITY CURVE:
+       Plot live equity curve with standard error bands derived from
+       backtest's per-trade std deviation. If live curve drops below the
+       lower band for K consecutive trades (e.g., K=10), stop trading.
+
+    C) EQUITY CURVE MOVING AVERAGE:
+       Compute SMA(equity_curve, N) where N = ~50 trades.
+       If equity_curve falls below SMA, reduce position size or stop
+       trading.
+
+    D) MAXIMUM DRAWDOWN LIMIT:
+       Stop trading if live max_drawdown exceeds the 95th percentile of
+       Monte Carlo simulation distribution.
+
+    Action when triggered:
+    - First sign of trouble: reduce position size by 50%
+    - Confirmed trouble: stop trading the system entirely
+    - Re-evaluate via walk-forward optimization to determine if a
+      parameter update can restore viability
+
+    The framework uses FIXED position sizing (Bandy's recommendation
+    when monitoring) — variable sizing confounds health diagnostics.
+  indicators_used:
+    - name: win_rate_t_test
+      lookback_period: "Recent N trades"
+      formula_reference: "Two-proportion z-test of recent win rate vs backtest baseline"
+      applied_to: "trade outcomes"
+    - name: equity_curve_standard_error_bands
+      lookback_period: "Backtest period for SE estimation"
+      formula_reference: "SE = stdev(trade_returns) × sqrt(N); plot ±2 SE bands around expected curve"
+      applied_to: "live equity curve"
+    - name: SMA_of_equity_curve
+      lookback_period: 50
+      formula_reference: "SMA over last 50 trades"
+      applied_to: "equity curve"
+  entry_price: per_underlying_strategy
+  entry_time: per_underlying_strategy
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_per_underlying
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "FIXED sizing during health monitoring (per Bandy); reduce or stop on trigger"
+  max_concurrent_positions: per_underlying_strategy
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Health-check trigger overrides ALL other rules"
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Built into health check — drawdown limit triggers stop"
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: "Per underlying"
+  data_frequency: daily
+  minimum_history_required: "Backtest period sufficient to estimate SE bands"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Methodology, used live"
+  test_universe: "Any traded system"
+  cagr: NOT_SPECIFIED
+  sharpe: "Health check is meant to PROTECT downside; Sharpe contribution is via avoiding broken-strategy losses"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Bandy's central insight: many strategies break silently — observing
+    only the equity curve isn't enough. Statistical tests on the trade
+    distribution and on the equity curve's deviation from expectation
+    catch breakdowns earlier.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Bayesian update on win rate (instead of t-test)"
+  - "Drawdown control via Kelly fraction adjustment"
+  - "Combined with walk-forward re-optimization on trigger"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Number of trades for win-rate test: typically 30+ for stable
+    inference; fewer trades produce wide confidence intervals.
+  - SE band width: ±2 SE is standard 95% confidence; tighter or wider
+    is a tradeoff between false positives and detection latency.
+look_ahead_bias_warnings: "Live monitoring is causal by definition."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: |
+  - Repeated testing of system health is itself multiple-testing;
+    apply Bonferroni correction or use sequential probability ratio
+    test (SPRT) for proper inference.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_walk_forward_overlay_v1
+  - bandy_monte_carlo_validation_v1
+prerequisites: "Underlying strategy in live trading"

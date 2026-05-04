@@ -1,0 +1,122 @@
+# =============================================================================
+# Connors Double 7's — buy 7-day low, exit 7-day high (with 200-SMA trend filter)
+# =============================================================================
+
+strategy_id: connors_double7_v1
+name: "Double 7's Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "Short Term Trading Strategies That Work"
+  chapter_or_url: "Double 7's chapter; co-authored with Cesar Alvarez"
+  publication_year: 2008
+  page_or_section: "Double 7's chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: rolling_low_break
+asset_class: [etfs]
+specific_instruments: "Broad-market ETFs (SPY, QQQ, IWM, DIA) and sector ETFs"
+timeframe: daily
+holding_period_typical: "1–10 trading days; 5 days typical"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t
+    2. close(t) == min(close[t-6 .. t]) — the close is the lowest of the past 7 closes (inclusive)
+    3. No position currently open in this instrument
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: rolling_min_close_7
+      lookback_period: 7
+      formula_reference: "Rolling minimum of close over the last 7 bars (inclusive of current bar)"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close long at close(t) when close(t) == max(close[t-6 .. t]) — close is the highest of the past 7 closes"
+  stop_loss: "None per author"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Only one exit; not applicable"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter built into entry"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars for SMA + 7 bars rolling extremum"
+  benchmark: "Buy-and-hold the ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps market-on-close"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 1993–2008 (book era)"
+  test_universe: "Liquid ETF universe"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author and follow-up tests report 80%+ win rate"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Independent reviews show win rate often offset by larger losers than winners; document but not author's claim."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use 5-day or 10-day window instead of 7"
+  - "Add a second condition: close(t) < SMA(close, 5) — shallower entries"
+  - "Symmetric short version when below 200-SMA: enter on 7-day high, exit on 7-day low"
+  - "Pyramid into a second unit on a subsequent 7-day low"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - "7-day low" interpreted as the lowest close over a rolling 7-bar window
+    inclusive of the current bar. Some implementations use a 7-day low of
+    the LOW (not close); author's wording supports close-based.
+  - Window includes the current bar; if today's close equals the window
+    minimum, the signal triggers.
+look_ahead_bias_warnings: "Same as RSI(2) — close-of-day signal with close-of-day fill assumed."
+survivorship_bias_warnings: "ETF universe is survivorship-immune."
+data_snooping_warnings: "Window length 7 is heuristic; sensitivity 5–10 days yields similar but not identical edges."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_3day_high_low_v1
+  - connors_rsi2_v1
+prerequisites: None

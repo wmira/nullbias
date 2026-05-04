@@ -1,0 +1,121 @@
+strategy_id: kaufman_intraday_breakout_v1
+name: "Intraday Opening Range Breakout"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Trading Systems and Methods"
+  chapter_or_url: "Intraday breakout chapter"
+  publication_year: 1987
+  page_or_section: "Intraday breakout"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: intraday_opening_range_breakout
+asset_class: [equities, etfs, futures]
+specific_instruments: "Liquid intraday-tradable instruments"
+timeframe: intraday_15min
+holding_period_typical: "Intraday — entry after open, exit before close"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid intraday instruments"
+liquidity_filter: "Tight intraday bid-ask"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Skip days with major scheduled events (Fed, NFP) unless explicitly trading them"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Intraday opening-range breakout:
+
+    1. Define opening range: first N minutes after market open
+       (typical: 30 or 60 minutes)
+    2. opening_high = max(high) over opening range
+       opening_low = min(low) over opening range
+    3. After opening range closes:
+         If price breaks above opening_high: BUY at break + 1 tick
+         If price breaks below opening_low: SHORT at break - 1 tick
+       (Whichever fires first defines the trade direction.)
+    4. Trade only the first directional break per day.
+
+    Optional volume confirmation: require breakout volume > 1.5 × average
+    of opening-range volume.
+  indicators_used:
+    - name: opening_range_high_low
+      lookback_period: "First 30-60 minutes of session"
+      formula_reference: "max(high) and min(low) over first N minutes after market open"
+      applied_to: high_low
+  entry_price: stop_above_opening_high_or_below_opening_low
+  entry_time: "Intraday after opening range closes"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Stop distance = opening range mid - opposite breakout level"
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Optional: 2× opening range size from entry"
+  stop_loss: "Opposite side of opening range"
+  time_stop: "Market-on-close exit (MANDATORY — do not hold overnight)"
+  trailing_stop: "Trail behind opposite extreme of subsequent intraday bars"
+  signal_reversal: None
+  exit_priority: "Stop → trailing → time stop → target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: ["intraday minute or 15-min OHLC"]
+  data_frequency: intraday_15min
+  minimum_history_required: "1 day"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "Per-contract / per-trade"
+  slippage_assumption: "5-10 bps for stocks intraday; 1 spread for futures"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Stocks, futures"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Daily (one trade per day)"
+  notes: "Classic ORB strategy. Edge has diminished over time as more participants trade it; may work better on less-followed instruments."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "5-minute or 15-minute opening range"
+  - "First 5 min or 15 min only (very fast ORB)"
+  - "Add VWAP filter"
+  - "Apply on weekly opening range (first day of week)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Opening range length is the key tunable.
+  - Intraday data required; daily-bar backtesting cannot reproduce.
+look_ahead_bias_warnings: "Stop entries are causal."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Edge has degraded; OOS robustness limited."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_intraday_leveraged_etf_momentum_v1
+  - chan_overnight_gap_momentum_v1
+prerequisites: "Intraday data feed; intraday execution capability"

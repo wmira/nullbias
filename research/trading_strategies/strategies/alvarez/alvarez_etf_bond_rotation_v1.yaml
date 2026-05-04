@@ -1,0 +1,124 @@
+strategy_id: alvarez_etf_bond_rotation_v1
+name: "ETF Bond Rotation"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "ETF Bond Rotation"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/etf-bond-rotation/"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: bond_etf_rotation
+asset_class: [etfs, bonds]
+specific_instruments: |
+  Treasury and credit bond ETFs:
+  TLT (long Treasuries), IEF (7-10yr), SHY (1-3yr), TIP (TIPS), LQD (IG corp),
+  HYG (high yield), EMB (emerging markets bonds), MUB (munis), AGG (aggregate)
+timeframe: monthly
+holding_period_typical: "1 month"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US bond ETFs across maturities and credit qualities"
+liquidity_filter: "ETF AUM > $500M (canonical liquidity threshold)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month:
+    1. For each bond ETF, compute return_3m = (close / close[63]) - 1
+    2. Filter: keep only ETFs where close > SMA(close, 126)  (6-month SMA)
+    3. Rank passing ETFs descending by return_3m
+    4. Buy the top N (author tests N=1, 2, 3; default N=2)
+    5. If fewer than N pass, fill remaining slots with cash (or SHY)
+  indicators_used:
+    - name: ROC
+      lookback_period: 63
+      formula_reference: "(close[t] / close[t-63]) - 1"
+      applied_to: close
+    - name: SMA
+      lookback_period: 126
+      formula_reference: simple
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 50      # 100/2 default
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 2
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-rank rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-month re-evaluation"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-ETF 6-month SMA filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "126 bars per ETF"
+  benchmark: "AGG buy-and-hold or 60/40 SPY/AGG"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "3 bps per fill (bond ETFs)"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2017"
+  test_universe: "Bond ETF universe above"
+  cagr: "Author reports moderate CAR with reduced drawdown vs SPY"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "N=1 (single best bond) — more concentrated"
+  - "N=3"
+  - "Use 6m return instead of 3m"
+  - "Replace SMA filter with: passing only if close > close[126]"
+  - "Combine with SPY for hybrid stock/bond rotation"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 3-month return = 63 trading days (calendar quarter approx).
+  - 6-month SMA = 126 trading days.
+  - Cash fallback: when no ETFs qualify, hold SHY (cash-equivalent).
+  - HYG inception 2007, EMB inception 2007 — earlier dates have a
+    smaller universe.
+look_ahead_bias_warnings: "EOM signal, next-session open fill."
+survivorship_bias_warnings: "Some bond ETFs have been delisted (rare); use point-in-time data."
+data_snooping_warnings: "63/126-day windows are conventional; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_country_etf_rotation_v1
+  - alvarez_spy_tlt_rotation_v1
+prerequisites: None

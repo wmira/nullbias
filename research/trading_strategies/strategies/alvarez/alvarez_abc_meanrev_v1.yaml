@@ -1,0 +1,152 @@
+strategy_id: alvarez_abc_meanrev_v1
+name: "ABCs Mean Reversion Strategy (Canonical Template)"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "The ABCs of creating a mean reversion strategy — Part 1 & Part 2"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/the-abcs-of-creating-a-mean-reversion-strategy-part1/ and /the-abcs-of-creating-a-mean-reversion-strategy-part-2/"
+  publication_year: 2018
+  page_or_section: "Two-part series; this YAML codifies the canonical assembled strategy"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: combined_indicators_with_ranking
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks (canonical demo); also tested on Russell 3000"
+timeframe: daily
+holding_period_typical: "3–7 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - S&P 500 membership (point-in-time)
+  - close > $5
+  - 21-day average dollar volume > $10M
+  - close > SMA(close, 100)         (per-stock uptrend filter; faster than 200)
+liquidity_filter: "21-day avg(close*volume) > $10M"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: "Optional: skip stocks within 1 day of earnings"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Combined two-indicator setup at the close of bar t. ALL of:
+    1. SPY close > SMA(SPY.close, 200)         (market regime)
+    2. close(t) > SMA(close, 100)               (per-stock uptrend)
+    3. RSI(close, 2)[t] < 5                     (mean-reversion indicator #1)
+    4. close(t) <= SMA(close, 10) * 0.95        (mean-reversion indicator #2:
+                                                 5% or more below the 10-day MA)
+    5. No position already open in this stock
+
+    If more candidates qualify than the strategy can hold (max 10):
+    Rank by historical_volatility_100d descending; prefer higher vol.
+    Place a limit order for next day at close(t) * 0.96. Fill if low(t+1) ≤ limit.
+  indicators_used:
+    - name: SMA (SPY)
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: SMA
+      lookback_period: 100
+      formula_reference: simple
+      applied_to: close
+    - name: SMA
+      lookback_period: 10
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+    - name: realized_volatility
+      lookback_period: 100
+      formula_reference: "stdev of daily arithmetic returns over 100 days × sqrt(252)"
+      applied_to: returns
+  entry_price: "Limit order at 0.96 * close(t) on day t+1"
+  entry_time: "Intraday on t+1 if low(t+1) <= limit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit at next open after RSI(close, 2) > 65"
+  stop_loss: None
+  time_stop: "8 bars (next open after 8 bars in trade)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Profit target first; time stop second"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "SPY 200-SMA hard regime gate"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SPY SMA) + 100 bars (HV)"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5–10 bps for stocks"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1/1/2007 onward in original posts"
+  test_universe: "S&P 500"
+  cagr: "Author reports double-digit CAGR with low drawdowns"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "High (~70%+) per author's example tables"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    The ABCs series is a *teaching template*; the exact parameter set chosen
+    here is one of several documented configurations. Author's purpose is
+    to teach the construction process more than to advocate a single
+    canonical instance.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop the 'close 5% below 10-SMA' filter; rely on RSI(2) < 5 alone"
+  - "Use ConnorsRSI < 5 instead of RSI(2) < 5"
+  - "Rank by 3+5+7 day return ascending instead of HV descending"
+  - "Limit-order distance 3% or 5% instead of 4%"
+  - "20-position portfolio at 5% each instead of 10/10"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author's series is a TEACHING template; the literal canonical 'ABC'
+    strategy doesn't exist as a single named system. The version above
+    encodes the parameter set most consistently demonstrated across his
+    Part 1 & Part 2 posts.
+  - 100-day historical volatility is the author's preferred ranker for
+    mean-reversion candidates.
+  - The 5%-below-10-SMA filter is a simplified version of the 'moving
+    average stretch' indicator family.
+look_ahead_bias_warnings: "Limit order at 0.96 of close(t), fill on day t+1 — no look-ahead."
+survivorship_bias_warnings: "Material — must use point-in-time S&P 500 membership."
+data_snooping_warnings: "Multiple parameters; the ABC series itself documents the curve-fitting risk."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_simple_meanrev_v1
+  - alvarez_rsi2_rule_change_v1
+  - alvarez_meanrev_entry_timing_v1
+  - connors_rsi2_v1
+prerequisites: None

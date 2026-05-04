@@ -1,0 +1,140 @@
+strategy_id: chan_factor_etf_arb_v1
+name: "Factor Model ETF Arbitrage (Multi-Asset Mean Reversion)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Machine Trading: Deploying Computer Algorithms to Conquer the Markets"
+  chapter_or_url: "Factor model chapter"
+  publication_year: 2017
+  page_or_section: "Factor models and intraday strategies chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: factor_model_residual_meanrev
+asset_class: [etfs]
+specific_instruments: "Sector ETFs (XLF, XLK, XLE, etc.) regressed on broad market and sector factor proxies"
+timeframe: daily
+holding_period_typical: "Days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "US sector and country ETFs with sufficient liquidity"
+liquidity_filter: "Tight spreads, high volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation:
+
+    1. For each ETF in the universe, regress its daily returns on factor
+       returns (typically: SPY, sector benchmark, plus optional macro factors
+       like USD, oil, rates):
+         r_ETF,t = α + β_1 × r_SPY,t + β_2 × r_sector,t + ... + ε_t
+
+    2. Compute residual ε_t (the unexplained portion of the ETF return)
+
+    3. Cumulative residual:
+         cum_resid_t = sum of ε_t over rolling 20 days
+
+    4. Z-score:
+         z_t = (cum_resid_t - rolling_mean) / rolling_stdev
+
+    5. Trade rules:
+         z_t < -2: LONG the ETF, hedge via factors (long position
+                    with factor-equivalent short exposure)
+         z_t > +2: SHORT the ETF with factor-equivalent long hedge
+         |z_t| < 0.5: close
+
+    Effect: bets that ETF-specific (idiosyncratic) deviations mean-revert
+    while removing systematic factor exposure.
+  indicators_used:
+    - name: factor_regression_residual
+      lookback_period: 252
+      formula_reference: "Multi-factor OLS regression of ETF returns on factor returns; residual = unexplained portion"
+      applied_to: "ETF returns"
+    - name: rolling_zscore_of_cumulative_residual
+      lookback_period: 20
+      formula_reference: "Cumulative residual over 20 days, z-scored on rolling 60-day window"
+      applied_to: "residual series"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: factor_neutral_position
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: |
+    Long ETF position $X
+    Short factor portfolio at β-weighted exposures (or short SPY at β_1×$X)
+    so that the position is approximately factor-neutral
+  max_concurrent_positions: "All ETFs with active signal"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when |z_t| < 0.5"
+  stop_loss: "Optional: |z_t| > 4 (idiosyncratic shock that hasn't reverted)"
+  time_stop: "Optional: 30-day time stop"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Z-reversion → optional stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars for factor model + 60 for z-score"
+  benchmark: "Cash / market-neutral"
+  starting_capital: 100000
+  commission_assumption: "Per-trade × multiple legs (ETF + factor hedges)"
+  slippage_assumption: "5-10 bps per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-year in book"
+  test_universe: "Sector ETFs vs SPY + sector factors"
+  cagr: "Modest absolute returns; primary value is uncorrelated alpha"
+  sharpe: "Author shows positive Sharpe net of factor exposure"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Strategy isolates ETF-specific alpha by neutralising market factor exposure. Higher implementation complexity than naked pairs."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Single-factor (only SPY) — simpler hedge"
+  - "Use FF-style factor portfolio (SMB, HML, UMD)"
+  - "Apply on individual stocks within a sector (more candidates)"
+  - "PCA-derived factors instead of pre-specified"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Factor selection is the critical design choice. Chan's book uses
+    SPY + sector ETFs as factors; PCA / FF-3 / FF-5 are alternatives.
+  - Hedge ratios (βs) re-estimated periodically (e.g., monthly).
+  - Cumulative residual is mean-reverting if factor model is well-specified.
+look_ahead_bias_warnings: "Use lagged β estimates; in-sample β is curve-fit."
+survivorship_bias_warnings: "Negligible (sector ETFs)."
+data_snooping_warnings: "Factor and lookback choices are tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_pairs_engle_granger_v1
+  - chan_pairs_johansen_v1
+  - chan_bollinger_meanrev_v1
+prerequisites: "Multi-leg execution capability"

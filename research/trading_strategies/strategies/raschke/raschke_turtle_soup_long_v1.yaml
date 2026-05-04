@@ -1,0 +1,129 @@
+strategy_id: raschke_turtle_soup_long_v1
+name: "Turtle Soup (Long) — Failed 20-Day Low Reversal"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts: High Probability Short-Term Trading Strategies"
+  chapter_or_url: "Turtle Soup chapter; with Larry Connors"
+  publication_year: 1995
+  page_or_section: "Turtle Soup chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: failed_breakout_fade
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid daily-chart instruments"
+timeframe: daily
+holding_period_typical: "1-5 days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid stocks, futures, and ETFs"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Trade-day setup (today, bar t):
+
+    1. low(t) < min(low[t-20 .. t-1])
+       (today's low is a NEW 20-day low)
+    2. The previous 20-day low (i.e., min(low[t-20..t-1])) occurred at
+       least 4 bars ago (so the previous low was in t-4 or earlier).
+       This avoids reacting to fresh lows from yesterday or two days ago.
+    3. Today's session continues normally — wait for next bar.
+
+    Trade-day execution (bar t+1):
+
+    4. Place a buy stop at: previous_20_day_low + 5-10 ticks
+       (Raschke's tick buffer protects against re-test that doesn't
+        actually break upward.)
+    5. Order is GOOD FOR ONE DAY (cancel at close of t+1 if not filled).
+
+    Logic: A breakdown of a 20-day low typically draws in trend-followers
+    (Turtle-style breakouts). When the breakdown FAILS — price recovers
+    above the breakout level — those breakout trades are squeezed,
+    creating a bounce.
+  indicators_used:
+    - name: rolling_min_low
+      lookback_period: 20
+      formula_reference: "min(low[t-20..t-1]) — exclusive of bar t"
+      applied_to: low
+  entry_price: stop_above_prior_20_day_low_plus_buffer
+  entry_time: "Day t+1, intraday if buy stop is hit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position = (equity × 1%) / (entry_price - stop_loss)"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Prior swing high or partial profits at first resistance"
+  stop_loss: "1-2 ticks below the low of bar t (today's new 20-day low)"
+  time_stop: "5-bar time stop"
+  trailing_stop: "Optional: trail stop below 5-day low after 3 bars in trade"
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Stop loss → time stop → profit target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None  # this is a counter-trend setup
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "20 bars (rolling low) + 4-day spacing rule"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995"
+  test_universe: "Futures and stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Counter-trend by design — works because trend-followers' stops cluster just below 20-day lows. Modern futures may have fewer Turtle-style breakout traders, eroding the edge."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "10-day or 30-day breakout level instead of 20"
+  - "Turtle Soup Plus One (variant with extra confirmation day)"
+  - "Apply intraday on 60-min charts"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Previous 20-day low must be at least 4 days in the past' is the
+    book's filter; without it, daily oscillation triggers many false setups.
+  - Tick buffer (5-10 ticks above prior low) varies by instrument; convert
+    to ~0.1% or 0.05 × ATR for cross-instrument robustness.
+look_ahead_bias_warnings: "Stop-entry order — fills only if intraday price exceeds level."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Edge has likely diminished as Turtle systems became less prevalent post-2000s."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_turtle_soup_short_v1
+  - connors_double7_v1
+  - chan_bollinger_meanrev_v1
+prerequisites: None

@@ -1,0 +1,144 @@
+strategy_id: longmore_crypto_stat_arb_v1
+name: "Crypto Cross-Sectional Statistical Arbitrage"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Quantifying and Combining Crypto Alphas; Ideas for Crypto Stat Arb Features"
+  chapter_or_url: "robotwealth.com/quantifying-and-combining-crypto-alphas/ ; /ideas-for-crypto-stat-arb-features/"
+  publication_year: 2022
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: pairs
+sub_category: crypto_cross_sectional_factor
+asset_class: [crypto]
+specific_instruments: "Top 50-100 crypto by market cap with sufficient liquidity"
+timeframe: daily
+holding_period_typical: "Hours to days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Top crypto perpetuals by 30-day volume"
+liquidity_filter: "Daily volume > $50M"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Recent listings (< 6 months); known token-economic events"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Cross-sectional alpha framework:
+
+    1. Compute multiple alpha signals per asset:
+       - Short-term momentum (1-3 day)
+       - Mean reversion (5-day z-score)
+       - Funding rate (cross-section rank)
+       - Volume-weighted return
+       - On-chain metrics (active addresses, etc.)
+    2. Z-score each signal across the cross-section.
+    3. Combine signals into composite alpha score:
+         alpha_t = w_1 × z_momentum + w_2 × z_meanrev + ...
+       Weights chosen to be approximately equal-risk after correlation
+       adjustment.
+    4. Long top-quintile composite alpha; short bottom-quintile.
+    5. Equal-dollar long and short legs (market neutral).
+    6. Rebalance daily.
+
+    Robot Wealth's emphasis: combining MULTIPLE weak alphas into
+    one composite is more robust than betting heavily on any single
+    signal.
+  indicators_used:
+    - name: short_term_momentum
+      lookback_period: "1-3 days"
+      formula_reference: "(close[t] / close[t-N]) - 1"
+      applied_to: close
+    - name: mean_reversion_zscore
+      lookback_period: 5
+      formula_reference: "(close - SMA(5)) / stdev(5)"
+      applied_to: close
+    - name: funding_rate_rank
+      lookback_period: 1
+      formula_reference: "Cross-sectional rank of current funding"
+      applied_to: "perp funding"
+    - name: composite_alpha
+      lookback_period: "Per signal"
+      formula_reference: "Weighted sum of z-scored signals"
+      applied_to: "alpha signal series"
+  entry_price: market_at_close
+  entry_time: "Daily close"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight_long_short
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Equal-dollar in each quintile; ~5% per name"
+  max_concurrent_positions: "Top 20 long, bottom 20 short (quintiles of 100-name universe)"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: NOT_SPECIFIED
+  time_stop: "Daily re-rank"
+  trailing_stop: None
+  signal_reversal: "Rank changes daily"
+  exit_priority: "Daily re-rank"
+  exit_price: market_at_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: "Multi-leg market-neutral has implicit correlation control"
+  sector_concentration_limits: "L1 vs L2 vs DeFi vs other categorisation optional"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume, funding_rate]
+  data_frequency: daily
+  minimum_history_required: "1+ year"
+  benchmark: "BTC buy-and-hold or 0% (market neutral baseline)"
+  starting_capital: 100000
+  commission_assumption: "5-10 bps per round-trip per leg"
+  slippage_assumption: "10-20 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-year (since perp futures liquid)"
+  test_universe: "Top crypto perps"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author reports modestly positive Sharpe net of costs"
+  max_dd: "Lower than directional crypto strategies"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "High frequency (daily rebalance × N names)"
+  notes: |
+    Crypto stat-arb is much harder than equity stat-arb due to
+    correlation — most crypto move together when BTC moves. Edge is
+    real but small after costs.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Hourly rebalance (more turnover, more cost)"
+  - "Cross-exchange arb (instead of cross-asset)"
+  - "Add macro-regime overlays"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Composite weights — Robot Wealth advocates equal-risk; alternatives
+    include IC-optimised, ML-derived.
+  - Cost modelling critical: slippage > 5 bps per leg can eliminate
+    edge.
+look_ahead_bias_warnings: "Use lagged signals only; ranking computed at close, fill at next-period."
+survivorship_bias_warnings: "Material — many alts have been delisted."
+data_snooping_warnings: "Multi-signal composite has many tunables; rigorous OOS critical."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - longmore_crypto_carry_v1
+  - chan_pairs_engle_granger_v1
+  - carver_relmomentum_v1
+prerequisites: "Crypto exchange access; multi-asset execution"

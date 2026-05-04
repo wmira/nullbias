@@ -1,0 +1,150 @@
+strategy_id: lopez_de_prado_hrp_v1
+name: "Hierarchical Risk Parity (HRP) Portfolio Construction"
+author: Marcos López de Prado
+
+source:
+  type: paper
+  title: "Building Diversified Portfolios that Outperform Out-of-Sample"
+  chapter_or_url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678 ; Advances in Financial Machine Learning Chapter 16"
+  publication_year: 2016
+  page_or_section: "SSRN paper + book chapter 16"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: portfolio_construction_overlay
+asset_class: [equities, etfs, futures, bonds]
+specific_instruments: "Multi-asset universe; allocation rule, not entry-exit signal"
+timeframe: monthly
+holding_period_typical: "Period between rebalances (typically monthly)"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Multi-asset universe — defined by user (e.g., diversified ETF basket, futures portfolio)"
+liquidity_filter: "Per asset"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    HRP is a portfolio CONSTRUCTION method (an allocation overlay).
+    It produces weights for a long-only portfolio, replacing
+    Markowitz mean-variance.
+
+    Algorithm (3 steps):
+
+    Step 1 — Hierarchical Clustering:
+      Compute correlation matrix ρ from N asset return series.
+      Convert to distance: d_ij = sqrt(0.5 × (1 - ρ_ij))
+      Apply hierarchical clustering (single-linkage typical) to produce
+      a dendrogram.
+
+    Step 2 — Quasi-Diagonalization:
+      Reorder the covariance matrix Σ so that similar assets are
+      adjacent (using the dendrogram leaf order).
+
+    Step 3 — Recursive Bisection:
+      Starting with the full set V, recursively split into two
+      sub-clusters V_1 and V_2 based on the dendrogram.
+      For each split:
+        compute σ_1 = sqrt(w_1' Σ_{V_1} w_1)
+        compute σ_2 = sqrt(w_2' Σ_{V_2} w_2)
+        scale weights: α = σ_2 / (σ_1 + σ_2)  (inverse-variance weighting)
+        weight_V_1_assets *= α
+        weight_V_2_assets *= (1 - α)
+      Continue until each cluster has 1 asset.
+
+    Final weights are HRP allocation. Rebalance monthly or as user
+    chooses.
+  indicators_used:
+    - name: rolling_correlation_matrix
+      lookback_period: 252
+      formula_reference: "Pearson correlation of daily returns over last 252 bars"
+      applied_to: returns
+    - name: hierarchical_clustering
+      lookback_period: "Computed from correlation matrix"
+      formula_reference: "scipy.cluster.hierarchy.linkage with method='single' (or 'ward')"
+      applied_to: "1 - correlation distance"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: hrp_weighted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED  # determined by HRP weights
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Each asset gets HRP-derived weight; weights sum to 1.0"
+  max_concurrent_positions: "All assets in universe (long-only)"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Built into HRP — clusters of correlated assets share weight"
+  sector_concentration_limits: "Implicit through clustering"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per asset for correlation matrix"
+  benchmark: "Equal-weight, 60/40, mean-variance optimized portfolio"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in original SSRN paper (2016)"
+  test_universe: "Multi-asset basket"
+  cagr: "Comparable to mean-variance"
+  sharpe: "Higher OOS Sharpe than mean-variance per author's Monte Carlo tests"
+  max_dd: "Lower OOS max drawdown than mean-variance"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Author's central claim: HRP outperforms mean-variance OUT OF SAMPLE
+    despite mean-variance being optimal IN SAMPLE. The reason is that
+    HRP doesn't require the covariance matrix to be invertible and is
+    less sensitive to estimation error.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different linkage methods (ward, complete, average)"
+  - "Different correlation lookback (60, 126, 504 days)"
+  - "Constrained HRP (sector caps, position-size caps)"
+  - "Combine with momentum filter — only weight assets with positive momentum"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Linkage method: single-linkage is the original; Ward minimizes
+    variance and is more common in practice. Document choice.
+  - Correlation lookback affects stability — longer is more stable
+    but slower to adapt to regime changes.
+look_ahead_bias_warnings: "Use only past returns to compute correlation; rebalance with future weights."
+survivorship_bias_warnings: "Per universe."
+data_snooping_warnings: |
+  - HRP itself has no parameters to tune (algorithm is deterministic).
+    But the UNIVERSE selection is the critical choice and is itself
+    subject to selection bias.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_three_factor_etf_rotation_v1
+  - gray_robust_asset_allocation_v1
+  - carver_vol_target_overlay_v1
+prerequisites: "Multi-asset universe with correlated returns"

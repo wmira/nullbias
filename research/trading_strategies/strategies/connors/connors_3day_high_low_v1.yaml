@@ -1,0 +1,123 @@
+# =============================================================================
+# Connors 3-Day High/Low Method — three days of lower highs and lower lows
+# =============================================================================
+
+strategy_id: connors_3day_high_low_v1
+name: "3-Day High/Low Method"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "Strategy 1 in the book; co-authored with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "Strategy 1 chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: lower_highs_lower_lows
+asset_class: [etfs]
+specific_instruments: "Liquid US equity ETFs (SPY, QQQ, IWM, sector ETFs)"
+timeframe: daily
+holding_period_typical: "1–7 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index and sector ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t
+    2. close(t) < SMA(close, 5) at bar t
+    3. high(t) < high(t-1) AND high(t-1) < high(t-2)            # 3 lower highs
+    4. low(t)  < low(t-1)  AND low(t-1)  < low(t-2)             # 3 lower lows
+    5. No position currently open in this instrument
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: SMA
+      lookback_period: 5
+      formula_reference: simple
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when close(t) > SMA(close, 5) at bar t"
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Only one exit; not applicable"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into 200-SMA filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "200 bars for the 200-SMA + 2 bars for high/low sequence"
+  benchmark: "Buy-and-hold of the same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps for ETF MOC"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 1993–2008"
+  test_universe: "Liquid US ETFs"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports high win rates (~80%+) for qualifying ETFs"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Per-ETF tables in book."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "4 lower highs and 4 lower lows for stricter signal"
+  - "Combine with RSI(2) < 10 for further selectivity"
+  - "Apply on weekly bars (3 lower highs/lows in weeks)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - "Lower highs" interpreted strictly: high(t) < high(t-1). A version using
+    'less-than-or-equal' would slightly relax the signal; default to strict.
+  - Three consecutive lower highs/lows means the comparisons span bars t-2,
+    t-1, t (four bars are referenced: t-3 is the implicit prior).
+look_ahead_bias_warnings: "Close-of-day signal; live execution requires MOC fill or T+1 open."
+survivorship_bias_warnings: "Negligible (ETF universe)."
+data_snooping_warnings: "3-bar pattern is not heavily over-fit but is a heuristic; consider robustness with 2 and 4 day variants."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_double7_v1
+  - connors_mdd_v1
+  - connors_rsi2_v1
+prerequisites: None

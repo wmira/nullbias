@@ -1,0 +1,138 @@
+strategy_id: chan_etf_pairs_ewa_ewc_v1
+name: "EWA/EWC ETF Pair (Canonical Australia/Canada Cointegration)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Pairs trading chapter — extended worked example"
+  publication_year: 2013
+  page_or_section: "EWA/EWC chapter / blog posts"
+
+# === STRATEGY METADATA ===
+category: pairs
+sub_category: country_etf_pair
+asset_class: [etfs]
+specific_instruments: "EWA (iShares MSCI Australia) and EWC (iShares MSCI Canada) — both commodity-exposed developed economies"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Two-asset universe: EWA and EWC"
+liquidity_filter: "Both ETFs sufficiently liquid for retail size"
+fundamental_filter: "Economic justification: both economies are heavily commodity-exposed and trade similar global cycles"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Specific instance of chan_pairs_engle_granger_v1 / chan_kalman_filter_pairs_v1
+    on the EWA/EWC pair.
+
+    Daily process:
+
+    1. Estimate hedge ratio β via OLS on rolling 252-day window OR via
+       Kalman filter (Chan's preferred method as documented in book)
+    2. Compute spread:
+         spread_t = EWC_t - β_t × EWA_t
+    3. Rolling z-score (e.g., 20-day window):
+         z_t = (spread_t - mean(spread, 20)) / stdev(spread, 20)
+    4. Trade rules:
+         z_t < -2: LONG spread (long EWC, short β × EWA)
+         z_t > +2: SHORT spread (short EWC, long β × EWA)
+         |z_t| < 0.5: close position
+
+    Cointegration was historically very strong on this pair; Chan's book
+    backtests showed Sharpe ~1.5-2.0.
+  indicators_used:
+    - name: linear_regression_hedge_ratio_or_kalman
+      lookback_period: 252
+      formula_reference: "OLS β over 252 bars OR Kalman filter dynamic β (per chan_kalman_filter_pairs_v1)"
+      applied_to: "EWA, EWC closes"
+    - name: rolling_zscore
+      lookback_period: 20
+      formula_reference: "(spread - rolling_mean) / rolling_stdev"
+      applied_to: "spread series"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: dollar_neutral_per_pair
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 20
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Long $X EWC, short $X × β EWA — dollar-neutral"
+  max_concurrent_positions: 1  # the pair
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when |z_t| < 0.5"
+  stop_loss: "Optional: |z_t| > 4"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Z-reversion"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "If cointegration breaks down (rolling ADF p-value > 0.10), stop trading"
+  market_regime_filter: "Re-test cointegration monthly"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail × 2 legs"
+  slippage_assumption: "5 bps per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple windows in book; published versions through 2013"
+  test_universe: "EWA/EWC pair"
+  cagr: "Modest absolute returns; Sharpe was the headline metric"
+  sharpe: "Author reports Sharpe ~1.5-2.0 in original test windows"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Chan acknowledges that cointegration on this pair has WEAKENED post-2013
+    publication. His later blog post 'When cointegration of a pair breaks
+    down' specifically discusses the EWA/EWC case as an example of how
+    pairs can decouple unpredictably.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use Kalman filter for dynamic β (chan_kalman_filter_pairs_v1)"
+  - "Bollinger band entries (chan_bollinger_meanrev_v1) on the spread"
+  - "Apply same template to other developed-market commodity ETF pairs"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - β estimated on rolling 252 days; Kalman filter is the more sophisticated
+    alternative.
+  - Hedge ratio sign: positive (both ETFs move together), so β is typically
+    in (0.5, 1.5).
+  - Re-test cointegration with rolling ADF on residuals.
+look_ahead_bias_warnings: "Use lagged β for fills; in-sample β creates curve-fit."
+survivorship_bias_warnings: "None (both ETFs still trade)."
+data_snooping_warnings: |
+  - This pair has degraded since publication. It's a textbook example,
+    not a tradable strategy today. Treat as illustrative.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_pairs_engle_granger_v1
+  - chan_kalman_filter_pairs_v1
+  - chan_bollinger_meanrev_v1
+prerequisites: None

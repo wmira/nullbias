@@ -1,0 +1,13 @@
+strategy_id,author,name,category,sub_category,asset_class,timeframe,direction,source_type,source_title,publication_year,completeness_score,status
+connors_rsi2_v1,Larry Connors,RSI(2) Strategy,mean_reversion,oversold_pullback,equities;etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_r3_v1,Larry Connors,R3 Strategy,mean_reversion,oversold_pullback,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_double7_v1,Larry Connors,Double 7's Strategy,mean_reversion,rolling_low_break,etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_3day_high_low_v1,Larry Connors,3-Day High/Low Method,mean_reversion,lower_highs_lower_lows,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_mdd_v1,Larry Connors,Multiple Days Down (MDD),mean_reversion,count_of_down_days,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_mdu_v1,Larry Connors,Multiple Days Up (MDU),mean_reversion,count_of_up_days_short,etfs,daily,short_only,book,High Probability ETF Trading,2009,4,extracted
+connors_rsi25_75_v1,Larry Connors,RSI 25 / RSI 75 Strategy,mean_reversion,oversold_pullback,etfs,daily,long_short,book,High Probability ETF Trading,2009,5,extracted
+connors_pct_b_v1,Larry Connors,%b (Bollinger Bands) Strategy,mean_reversion,bollinger_extreme,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_tps_v1,Larry Connors,TPS (Time Price Scale-In),mean_reversion,pyramid_scale_in,etfs,daily,long_short,book,High Probability ETF Trading,2009,4,extracted
+connors_cumulative_rsi_v1,Larry Connors,Cumulative RSI Strategy,mean_reversion,oversold_pullback,equities;etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_crsi_pullback_v1,Larry Connors,ConnorsRSI Pullback Strategy,mean_reversion,composite_oversold,equities;etfs,daily,long_only,paper,An Introduction to ConnorsRSI / Pullbacks Guidebook,2012,4,extracted
+connors_vix_rsi_v1,Larry Connors,VIX RSI Strategy,mean_reversion,volatility_spike_buy,etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted

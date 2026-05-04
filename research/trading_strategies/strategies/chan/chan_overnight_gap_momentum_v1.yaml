@@ -1,0 +1,127 @@
+strategy_id: chan_overnight_gap_momentum_v1
+name: "Overnight Gap Momentum (Equity Index Futures)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Momentum chapters; epchan.blogspot.com posts on overnight gaps"
+  publication_year: 2013
+  page_or_section: "Gap momentum chapter"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: overnight_gap_continuation
+asset_class: [futures, etfs]
+specific_instruments: "Equity index futures (ES, NQ, FESX, NK, HSI) and broad-market ETFs (SPY, QQQ)"
+timeframe: daily
+holding_period_typical: "Intraday — open of day to close of day (or specific intraday window)"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid global equity index futures and broad-market ETFs"
+liquidity_filter: "High intraday volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation at the open:
+
+    1. Compute overnight gap:
+         gap_t = (open_t - close_{t-1}) / close_{t-1}
+    2. If gap_t > 0 (gap up):    BUY at open
+       If gap_t < 0 (gap down):  SELL/SHORT at open
+
+    Optional thresholds (Chan's variants):
+      Only act if |gap_t| > 0.5% to avoid noise
+      Or only act if |gap_t| z-score (vs rolling mean+stdev) > 1.5
+
+    Hold position until close-of-day, then exit at close.
+
+    Strategy is most effective on European and Asian indexes per Chan's
+    backtests (Dow Jones STOXX 50 produced IR ~1.4 in 2004-2012). US
+    indexes (SPY, ES) showed more nuanced behaviour with mean-reverting
+    open-to-close drift after large gaps.
+  indicators_used:
+    - name: overnight_gap
+      lookback_period: 1
+      formula_reference: "(open_t - close_{t-1}) / close_{t-1}"
+      applied_to: "open and close prices"
+  entry_price: market_at_open
+  entry_time: "Market open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 50
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Optional: scale size by gap magnitude"
+  max_concurrent_positions: 1  # per index
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Exit at close of same day (market-on-close)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Time stop"
+  exit_price: market_on_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, close]
+  data_frequency: daily
+  minimum_history_required: "1 day"
+  benchmark: "Buy-and-hold the underlying"
+  starting_capital: 100000
+  commission_assumption: "Per-contract for futures; $0 retail for ETFs"
+  slippage_assumption: "1-2 bps for liquid futures"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "2004-2012 in original blog tests"
+  test_universe: "Dow Jones STOXX 50, S&P 500, various indexes"
+  cagr: NOT_SPECIFIED
+  sharpe: "Information ratio ~1.4 on Dow Jones STOXX 50 (Chan's best example)"
+  max_dd: NOT_SPECIFIED
+  win_rate: "Modestly above 50%"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Daily — high trade count"
+  notes: "Chan notes that gap-up momentum and gap-down momentum may behave asymmetrically; testing each side separately is recommended."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Threshold of 1% or larger (only large gaps)"
+  - "Asymmetric sides (only trade gap-ups)"
+  - "Add intraday entry (e.g., enter at 9:45 instead of 9:30 to let gap stabilize)"
+  - "Combine with overnight news filter (only act on news-driven gaps)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Open' for futures = first regular-session price; for ETFs = official
+    NYSE/NASDAQ open.
+  - Cross-region effects matter — STOXX 50 gap is influenced by US prior-day
+    close; this is part of the edge.
+  - SPY-specific behaviour has been mean-reverting after big gaps in
+    recent years (per modern research) — strategy may not work on SPY.
+look_ahead_bias_warnings: "Open price is known immediately at market open; no look-ahead at signal time."
+survivorship_bias_warnings: "Negligible (index futures)."
+data_snooping_warnings: "Strategy publication may have eroded the edge; OOS test important."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_intraday_leveraged_etf_momentum_v1
+prerequisites: None

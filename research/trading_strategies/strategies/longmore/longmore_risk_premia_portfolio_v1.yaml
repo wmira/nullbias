@@ -1,0 +1,128 @@
+strategy_id: longmore_risk_premia_portfolio_v1
+name: "Risk Premia Portfolio (Multi-Asset Harvesting)"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Risk Premia Bootcamp; Robot Wealth blog posts on factor harvesting"
+  chapter_or_url: "robotwealth.com/category/quant-trading/trading-strategies/ ; index-of-strategies"
+  publication_year: 2020
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: multi_asset_risk_premia_harvest
+asset_class: [equities, etfs, bonds]
+specific_instruments: "Multi-asset ETF basket capturing equity, bond, REIT, commodity risk premia"
+timeframe: monthly
+holding_period_typical: "1+ months"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified ETF basket: SPY, EFA, EEM, AGG, TLT, VNQ, GLD, DBC"
+liquidity_filter: "Major ETFs"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Strategic baseline allocation harvesting equity, term, credit,
+    inflation, and commodity premia. Adjusted by momentum signals.
+
+    Step 1 — Baseline weights (risk-parity inspired):
+      Allocate inversely to long-run volatility:
+        weight_i = (1 / vol_i_5yr) / sum(1 / vol_j_5yr)
+      Adjust to user-defined risk budget per asset class.
+
+    Step 2 — Momentum overlay (Robot Wealth's adjustment):
+      Compute 12-month total return per asset
+      Adjust baseline weight by ±20% based on relative momentum:
+        Top-third assets: weight × 1.2
+        Bottom-third assets: weight × 0.8
+        Middle-third: weight × 1.0
+      Renormalise to sum to 1.
+
+    Step 3 — Rebalance monthly (or quarterly).
+  indicators_used:
+    - name: long_run_volatility
+      lookback_period: 1260  # 5 years
+      formula_reference: "stdev daily returns × sqrt(252)"
+      applied_to: returns
+    - name: 12_month_return
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: risk_parity_with_momentum_tilt
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 40
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Inverse-vol baseline; momentum-tilted ±20%"
+  max_concurrent_positions: 8
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly rebalance"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Implicit via inverse-vol weighting"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "5 years per asset"
+  benchmark: "60/40 SPY/AGG"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in bootcamp materials"
+  test_universe: "8-ETF basket"
+  cagr: "Comparable to 60/40 with smoother equity curve"
+  sharpe: "Higher than 60/40 due to diversification"
+  max_dd: "Lower than equity-heavy alternatives"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~12 rebalances per year per asset"
+  notes: "Robot Wealth's central bootcamp strategy — long-only diversified harvesting with momentum tilt for ~1.5x sharpening of returns."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Pure equal-weight (no inverse-vol)"
+  - "More aggressive momentum tilt (±50%)"
+  - "Add VIX-based defensive tilt"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Vol lookback 5 years balances stability and recency.
+  - ±20% momentum tilt heuristic; sweep robustness.
+look_ahead_bias_warnings: "EOM signal, next-open fill."
+survivorship_bias_warnings: "Negligible (major ETFs)."
+data_snooping_warnings: "Tilt parameters tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_three_factor_etf_rotation_v1
+  - gray_robust_asset_allocation_v1
+  - lopez_de_prado_hrp_v1
+prerequisites: None

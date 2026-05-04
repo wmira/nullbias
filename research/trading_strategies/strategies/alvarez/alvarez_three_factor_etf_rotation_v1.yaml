@@ -1,0 +1,143 @@
+strategy_id: alvarez_three_factor_etf_rotation_v1
+name: "Three Factor ETF Rotation"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "Three Factor ETF Rotation Strategy"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/three-factor-etf-rotation-strategy/"
+  publication_year: 2022
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: multi_factor_etf_rotation
+asset_class: [etfs]
+specific_instruments: "US sector SPDR ETFs: XLB, XLE, XLF, XLI, XLK, XLP, XLU, XLV, XLY (and optionally XLRE, XLC)"
+timeframe: monthly
+holding_period_typical: "1 month"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "US sector SPDR ETFs"
+liquidity_filter: "Implicit (sector SPDRs are highly liquid)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+    1. For each ETF, compute three factors:
+       a. short_term_return = (close / close[20]) - 1   (~1 month)
+       b. mid_term_return   = (close / close[126]) - 1  (~6 months)
+       c. volatility        = stdev(daily_returns over last 126 days), annualised
+    2. Apply primary regime filter: close > SMA(close, 200)
+       Only ETFs passing the filter remain eligible.
+    3. Rank eligible ETFs:
+       - rank by short_term_return descending      (rank_st)
+       - rank by mid_term_return descending        (rank_mt)
+       - rank by volatility ascending              (rank_vol; lowest vol best)
+    4. Composite score = rank_st + rank_mt + rank_vol  (lower is better)
+    5. Buy the top 1, 2, or 3 ETFs by composite score.
+       Author's documented portfolio uses top 3.
+    6. Hold until next month-end re-rank.
+    7. If fewer than 3 ETFs pass the regime filter, hold cash for the
+       remaining slots.
+  indicators_used:
+    - name: ROC
+      lookback_period: 20
+      formula_reference: "(close[t] / close[t-20]) - 1"
+      applied_to: close
+    - name: ROC
+      lookback_period: 126
+      formula_reference: "(close[t] / close[t-126]) - 1"
+      applied_to: close
+    - name: realized_volatility
+      lookback_period: 126
+      formula_reference: "stdev of daily log or arithmetic returns over 126 days * sqrt(252) for annualised"
+      applied_to: returns
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 33.33     # 100% / 3 if all 3 slots filled
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 3
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-rank rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-month re-rank"
+  exit_priority: "Single time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-ETF 200-SMA regime filter; non-passing slots go to cash"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "By definition diversifies across sectors"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (max of 200 SMA and 126-day vol/ROC)"
+  benchmark: "SPY buy-and-hold and 60% SPY / 40% TLT"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps per fill"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1/1/2007 – 6/30/2022"
+  test_universe: "9 SPDR sector ETFs"
+  cagr: "Three-position portfolio beat both SPY and 60/40 baseline"
+  sharpe: "Below baselines per author's own report"
+  max_dd: "Below SPY baseline"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Author notes shorter holding period (monthly rebalance) acts somewhat
+    like a stop-loss compared to longer-term rotations.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top 1 only — concentrated"
+  - "Top 5 — diluted"
+  - "Add safety-asset switch (IEF) when no ETFs pass regime filter"
+  - "Use 60-day vol instead of 126-day"
+  - "Drop the 200-SMA filter and rely purely on the volatility factor"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author tests 1/2/3-position portfolios; the documented 'best' is the
+    3-position version — encoded as default.
+  - Equal-weight composite (rank sum) is used rather than weighted-rank;
+    author does not explicitly weight the three factors.
+  - 'Short-term' is taken as 20 trading days (≈ 1 month); some posts use
+    21 days. Document and sweep.
+look_ahead_bias_warnings: "EOM signal, next-session open fill."
+survivorship_bias_warnings: "Sector ETFs stable; XLRE (2015) and XLC (2018) inception dates affect early-period universe."
+data_snooping_warnings: "Three factors and rank-sum composition is heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_etf_sector_rotation_v1
+  - alvarez_country_etf_rotation_v1
+prerequisites: None

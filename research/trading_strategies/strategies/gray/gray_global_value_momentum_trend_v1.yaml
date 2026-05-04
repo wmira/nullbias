@@ -1,0 +1,141 @@
+strategy_id: gray_global_value_momentum_trend_v1
+name: "Global Value-Momentum-Trend (GVMT)"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: paper
+  title: "The Global Value Momentum Trend Philosophy"
+  chapter_or_url: "https://alphaarchitect.com/wp-content/uploads/2021/08/The_Global_Value_Momentum_Trend_Philosophy.pdf"
+  publication_year: 2016
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: combined_value_momentum_with_trend_overlay
+asset_class: [equities]
+specific_instruments: "US (QVAL + QMOM stocks) and international (IVAL + IMOM stocks); blended"
+timeframe: quarterly
+holding_period_typical: "~3 months between rebalances"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Global equities — US large/mid + international developed; selected stocks from QVAL, QMOM, IVAL, IMOM rules"
+liquidity_filter: "Per sub-strategy"
+fundamental_filter: "Per sub-strategy"
+exclusions: "REITs, financials, utilities (per sub-strategy convention)"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Quarterly rebalance combining value and momentum stock selection
+    with a trend-based risk-off overlay.
+
+    Step 1 — Stock selection (50/50 value + momentum):
+      For US sleeve (50% of equity allocation):
+        50%: select QVAL stocks (gray_qval_etf_v1 process)
+        50%: select QMOM stocks (gray_qmom_etf_v1 process)
+      For International sleeve (50% of equity allocation):
+        50%: select IVAL stocks (international value)
+        50%: select IMOM stocks (international momentum, gray_intl_quant_momentum_v1)
+
+    Step 2 — Trend overlay (RAA-style):
+      For each region (US and Intl), compute the RAA composite signal:
+        composite = 0.5 × tmom_signal + 0.5 × ma12_signal
+      Allocate to that region's stock sleeve in proportion to composite.
+      Reduce allocation to safe asset (cash/T-Bills) when composite < 1.
+
+    Result:
+      US allocation = 50% × composite_US
+      Intl allocation = 50% × composite_Intl
+      Safe allocation = 100% - sum of equity sleeves
+  indicators_used:
+    - name: see_sub_strategies
+      lookback_period: "Per sub-strategy"
+      formula_reference: "Per sub-strategy"
+      applied_to: "fundamentals, prices, returns"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new quarter"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: composite_signal_scaled_allocation
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Per sub-strategy"
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: |
+    Each region's stock sleeve scaled by its trend composite (0, 0.5, or 1).
+    Residual cash routed to safe asset.
+  max_concurrent_positions: "Sum across sub-strategies"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly trend re-evaluation; quarterly stock re-selection"
+  trailing_stop: None
+  signal_reversal: "Trend overlay can flip monthly between full equity, half equity, and cash"
+  exit_priority: "Trend overlay"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Trend overlay flips to safe asset in severe downturns"
+  market_regime_filter: "Per-region TMOM + MA composite"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Per sub-strategy"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "fundamentals (US and intl)"
+    - "daily prices for trend overlay"
+  data_frequency: "Quarterly fundamentals; daily prices"
+  minimum_history_required: "252 bars + 2 years fundamentals"
+  benchmark: "MSCI World 50%/50% US-International"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in the white paper"
+  test_universe: "Global equities + safe asset"
+  cagr: "Author reports competitive total return with significantly reduced drawdowns"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Reduced vs MSCI World buy-and-hold"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    The trend overlay is the key risk-management feature; turns off
+    equity exposure during severe downturns. Without the overlay, the
+    strategy is just a 50/50 value/momentum global equity portfolio.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Equal-weight value/momentum (50/50) vs concentrated (75/25)"
+  - "Add bonds as a third asset class with its own trend signal"
+  - "Apply trend overlay only to most-volatile sleeve"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 50/50 value/momentum split is the canonical AA recommendation;
+    optimal weights drift over time.
+  - Trend overlay uses RAA composite (TMOM + MA, equal weight).
+  - Region split (50/50 US/Intl) is the canonical Alpha Architect
+    'global' allocation; varies in derivative implementations.
+look_ahead_bias_warnings: "Per sub-strategy."
+survivorship_bias_warnings: "Per sub-strategy."
+data_snooping_warnings: "Multi-component composition; in-sample tuning risk lower than single-rule strategies because each component is independently grounded."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_qval_etf_v1
+  - gray_qmom_etf_v1
+  - gray_intl_quant_momentum_v1
+  - gray_robust_asset_allocation_v1
+prerequisites: |
+  Constituent sub-strategies must be implemented; trend overlay requires
+  monthly evaluation of TMOM and MA per region.

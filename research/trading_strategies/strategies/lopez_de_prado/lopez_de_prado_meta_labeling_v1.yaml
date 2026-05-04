@@ -1,0 +1,150 @@
+strategy_id: lopez_de_prado_meta_labeling_v1
+name: "Meta-Labeling — Secondary ML Model on Primary Signals"
+author: Marcos López de Prado
+
+source:
+  type: book
+  title: "Advances in Financial Machine Learning"
+  chapter_or_url: "Chapter 3 (Labeling) — meta-labeling section"
+  publication_year: 2018
+  page_or_section: "Chapter 3.6"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: ml_signal_filtering_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying primary signal source"
+timeframe: daily
+holding_period_typical: "N/A — overlay"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by primary model"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Two-stage ML pipeline:
+
+    Stage 1 — Primary model:
+      Existing strategy that produces a SIDE prediction (long, short, flat)
+      Examples: any strategy in this index — connors_rsi2_v1, EWMAC,
+      pairs trading, etc. Or an ML classifier that predicts direction.
+
+    Stage 2 — Meta-labeling secondary model:
+      For each event where primary model fires:
+        a. Compute features (price, volume, technical indicators, etc.)
+        b. Apply triple-barrier labeling on subsequent price path:
+             label = 1 if profit barrier hit first (primary was right)
+             label = 0 if loss or time barrier hit first
+        c. Train binary classifier: features → label
+      In live use:
+        meta_score_t = secondary_model.predict_proba(features_t)
+      Take primary signal ONLY if meta_score > threshold (e.g., 0.6)
+
+    Net effect: keep primary's SIZE / DIRECTION decisions; meta-model
+    decides WHEN to act on them.
+
+    Benefit: improves precision (fewer false positives) at cost of recall.
+    Sharpe-improving even at the cost of fewer trades.
+  indicators_used:
+    - name: primary_signal
+      lookback_period: per_strategy
+      formula_reference: "Output of any underlying strategy in the index"
+      applied_to: per_strategy
+    - name: triple_barrier_labels
+      lookback_period: "5-21 bars forward"
+      formula_reference: "See lopez_de_prado_triple_barrier_v1"
+      applied_to: forward_price_path
+    - name: ml_classifier
+      lookback_period: "Training set: ALL prior events"
+      formula_reference: "Any binary classifier (RandomForest, GBM, neural net) trained on (features, triple_barrier_labels)"
+      applied_to: features_at_event
+  entry_price: per_primary_strategy
+  entry_time: "Same as primary, but only when meta_score above threshold"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: meta_score_scaled
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Optional: scale position size by meta_score (higher confidence = larger position)"
+  max_concurrent_positions: per_primary_strategy
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_primary_strategy
+  stop_loss: per_primary_strategy
+  time_stop: per_primary_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_primary_strategy
+  exit_price: per_primary_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Meta-model may learn implicit regime filter from features"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: per_primary
+  data_frequency: per_primary
+  minimum_history_required: "Sufficient labelled events to train classifier (e.g., 500+ events)"
+  benchmark: "Primary model alone (without meta-labeling)"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per primary"
+  slippage_assumption: "Per primary"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Demonstrated in book"
+  test_universe: "Various"
+  cagr: NOT_SPECIFIED
+  sharpe: "Improves Sharpe of primary model materially in book examples"
+  max_dd: NOT_SPECIFIED
+  win_rate: "Increased vs primary alone"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Decreased — only act on high-confidence meta-scores"
+  notes: |
+    The meta-model can use ANY features (technical indicators, market
+    regime variables, news sentiment). Author emphasises feature
+    engineering over model architecture.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different classifiers (logistic, RF, GBM, neural net)"
+  - "Different threshold values (0.5, 0.6, 0.7)"
+  - "Stacked meta-labelers (meta-meta-labeling)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Train/test split must respect time ordering (no shuffling).
+  - Use purged CV for proper OOS evaluation (Lopez de Prado Chapter 7).
+  - Class imbalance is common (most labels are 0); use class_weight or
+    SMOTE-style balancing carefully.
+look_ahead_bias_warnings: |
+  - Triple-barrier labels reach into the FUTURE relative to the event.
+    This is fine for training but the model must NOT use future-derived
+    features at inference time.
+  - Beware of feature contamination via windowed indicators that
+    include future data.
+survivorship_bias_warnings: "Per universe."
+data_snooping_warnings: |
+  - Threshold and feature-set selection are themselves subject to
+    multiple-testing bias. Use proper purged + embargoed CV.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - lopez_de_prado_triple_barrier_v1
+  - lopez_de_prado_cusum_filter_v1
+  - bandy_walk_forward_overlay_v1
+prerequisites: "Primary signal source + ML training infrastructure"

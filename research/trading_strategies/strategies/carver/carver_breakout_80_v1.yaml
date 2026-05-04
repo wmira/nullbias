@@ -1,0 +1,125 @@
+strategy_id: carver_breakout_80_v1
+name: "Breakout(80) — Slow Donchian-Style Channel Breakout"
+author: Robert Carver
+
+source:
+  type: blog_post
+  title: "A simple breakout trading rule (pysystemtrade)"
+  chapter_or_url: "https://qoppac.blogspot.com/2016/05/a-simple-breakout-trading-rule.html ; pysystemtrade GitHub `breakout` rule"
+  publication_year: 2016
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: channel_breakout
+asset_class: [futures]
+specific_instruments: "Diversified futures universe"
+timeframe: daily
+holding_period_typical: "Weeks to months; ~3× per year turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures"
+liquidity_filter: "Looser cost filter than fast breakout"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Same structure as carver_breakout_20_v1 with N=80:
+
+    1. roll_max = max(close[t-79..t])
+    2. roll_min = min(close[t-79..t])
+    3. roll_mid = (roll_max + roll_min) / 2
+    4. raw_position = (close[t] - roll_mid) / (roll_max - roll_min)
+    5. smoothed_position = EWMA(raw_position, span=20)        # span = N/4 = 20
+    6. forecast = smoothed_position × forecast_scalar
+       forecast_scalar (Breakout 80) ≈ 30
+    7. capped_forecast = clip(forecast, -20, +20)
+  indicators_used:
+    - name: rolling_max
+      lookback_period: 80
+      formula_reference: "max(close) over last 80 bars (inclusive)"
+      applied_to: close
+    - name: rolling_min
+      lookback_period: 80
+      formula_reference: "min(close) over last 80 bars (inclusive)"
+      applied_to: close
+    - name: EWMA
+      lookback_period: 20
+      formula_reference: "ewm(span=20)"
+      applied_to: "raw breakout position series"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 30.0
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM"
+  sector_concentration_limits: "FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "80 bars channel + 20 bars EWMA"
+  benchmark: "BTOP50 / Carver system"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone ~0.4; correlates more with slow EWMACs"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~3 round-trips per instrument per year"
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Breakout(40), (160), (320) for other speeds"
+  - "Without smoothing"
+  - "Use high/low instead of close"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: "Same as breakout_20."
+look_ahead_bias_warnings: "Same."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Channel length is the key knob."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_breakout_20_v1
+  - carver_ewmac_32_128_v1
+  - carver_ewmac_64_256_v1
+prerequisites: "Volatility-target overlay"

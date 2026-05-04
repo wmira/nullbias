@@ -1,0 +1,117 @@
+strategy_id: bandy_zscore_meanrev_v1
+name: "Bandy Z-Score Mean Reversion"
+author: Howard Bandy
+
+source:
+  type: book
+  title: "Mean Reversion Trading Systems"
+  chapter_or_url: "Z-score mean reversion chapter"
+  publication_year: 2013
+  page_or_section: "Z-score chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: zscore_deviation_from_mean
+asset_class: [equities, etfs]
+specific_instruments: "Liquid ETFs and stocks"
+timeframe: daily
+holding_period_typical: "1-3 days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity ETFs and large-cap stocks"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation:
+    1. close(t) > SMA(close, 200)
+    2. z_score(close, N) at bar t < -2
+       where z_score(close, N) = (close[t] - SMA(close, N)) / stdev(close, N)
+       Default N = 8 or 9 (Bandy's documented preferred lookback)
+    3. No position currently open
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: rolling_zscore
+      lookback_period: 8
+      formula_reference: "(close[t] - SMA(close, 8)) / stdev(close, 8); ddof=1 sample stdev"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when z_score(close, 8) crosses up through 0 (or 1 for tighter holds)"
+  stop_loss: None
+  time_stop: "2-3 bars"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Z-cross → time stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Equity-curve health check (Bandy methodology)"
+  market_regime_filter: "200-SMA filter built in"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars"
+  benchmark: "SPY"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-2013"
+  test_universe: "ETFs and stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports high win rate; specifics in book"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Z-score and RSI mean reversion produce similar trade entries but z-score gives a continuous-magnitude signal useful for sizing."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "z_score < -1.5 (less strict)"
+  - "Lookback 5, 10, 20 days"
+  - "Exit at z=1 instead of z=0 for longer holds"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 8-9 day lookback is Bandy's published sweet spot.
+  - Stdev convention: sample (ddof=1) or population (ddof=0); diff small at N=8.
+look_ahead_bias_warnings: "Standard close-of-day signal."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Lookback and threshold tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_rsi2_meanrev_v1
+  - bandy_bollinger_meanrev_v1
+  - chan_bollinger_meanrev_v1
+prerequisites: None

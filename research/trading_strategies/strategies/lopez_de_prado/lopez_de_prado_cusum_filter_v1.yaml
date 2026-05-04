@@ -1,0 +1,138 @@
+strategy_id: lopez_de_prado_cusum_filter_v1
+name: "CUSUM Filter for Event-Based Sampling"
+author: Marcos López de Prado
+
+source:
+  type: book
+  title: "Advances in Financial Machine Learning"
+  chapter_or_url: "Chapter 2 (Financial Data Structures); Chapter 3 (Labeling)"
+  publication_year: 2018
+  page_or_section: "Chapters 2-3"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: event_based_sampling_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any time series — used for downsampling"
+timeframe: daily
+holding_period_typical: "N/A — sampling methodology"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying ML strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    EVENT-BASED SAMPLING method to identify SIGNIFICANT price moves
+    while ignoring noise.
+
+    Algorithm:
+    1. Track cumulative deviation from a reference price:
+         S_high = max(0, S_high_prev + (price_t - price_{t-1}))
+         S_low  = min(0, S_low_prev + (price_t - price_{t-1}))
+    2. Trigger an EVENT when |cumulative deviation| > threshold h
+       (typically h = 2 × daily volatility)
+    3. On event:
+         If S_high >= h: positive event (significant up-move)
+         If S_low <= -h: negative event (significant down-move)
+         Reset both S_high and S_low to 0
+    4. Output: list of event timestamps where significant moves
+       occurred. Use these as entry-point candidates for an ML
+       model (instead of every bar).
+
+    Used in conjunction with triple-barrier labeling and meta-labeling
+    to focus ML training on meaningful events, not all bars (which
+    are mostly noise).
+  indicators_used:
+    - name: cumulative_deviation_S_high
+      lookback_period: "Recursive"
+      formula_reference: "S_high_t = max(0, S_high_{t-1} + (P_t - P_{t-1})); reset to 0 on event"
+      applied_to: close
+    - name: cumulative_deviation_S_low
+      lookback_period: "Recursive"
+      formula_reference: "S_low_t = min(0, S_low_{t-1} + (P_t - P_{t-1})); reset to 0 on event"
+      applied_to: close
+    - name: rolling_volatility_threshold
+      lookback_period: 100
+      formula_reference: "EWMA of daily returns × sqrt(scale); threshold h = e.g. 2 × this"
+      applied_to: returns
+  entry_price: per_underlying_ml_strategy
+  entry_time: "On event triggers (subset of all bars)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "CUSUM doesn't size; produces event timestamps"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: "daily or intraday"
+  minimum_history_required: "100+ bars for vol estimation"
+  benchmark: "Per underlying ML strategy"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Methodology"
+  test_universe: "Various"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    CUSUM is critical for ML on financial data — reduces noise by
+    sampling only when significant moves occur. Combined with
+    triple-barrier labels, produces tight ML training sets.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Volume-based CUSUM (cumulative volume rather than price)"
+  - "Asymmetric thresholds for up vs down events"
+  - "Adaptive threshold based on rolling volatility"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Threshold h is volatility-adaptive in canonical implementation;
+    fixed-value h is simpler but inferior.
+  - mlfinlab.filters.cusum_filter is the reference Python implementation.
+look_ahead_bias_warnings: "Causal computation."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "Threshold multiplier (e.g., 2× vol) is tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - lopez_de_prado_triple_barrier_v1
+  - lopez_de_prado_meta_labeling_v1
+prerequisites: "ML strategy that benefits from event-based sampling"

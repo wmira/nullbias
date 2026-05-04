@@ -1,0 +1,137 @@
+strategy_id: carver_relmomentum_v1
+name: "Relative Momentum (Cross-Sectional Return Rank)"
+author: Robert Carver
+
+source:
+  type: blog_post
+  title: "Risk targeting and dynamic asset allocation: absolute or relative momentum? / `relmomentum` rule in pysystemtrade"
+  chapter_or_url: "https://qoppac.blogspot.com/2019/03/risk-targeting-and-dynamic-asset.html ; AFTS Strategies 21-22"
+  publication_year: 2019
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: cross_sectional_momentum
+asset_class: [futures]
+specific_instruments: "Diversified futures across asset classes"
+timeframe: daily
+holding_period_typical: "Months — low turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures with comparable return histories"
+liquidity_filter: "Standard cost filter"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Cross-sectional momentum applied across futures.
+
+    1. For each instrument, compute volatility-normalised return over
+       lookback L (default L = 250 days):
+         norm_return[i] = (close[i,t] / close[i,t-L] - 1) / annualised_vol[i]
+    2. Compute cross-sectional mean of norm_return across all instruments.
+    3. demeaned_return[i] = norm_return[i] - mean_norm_return
+    4. forecast[i] = demeaned_return[i] × forecast_scalar
+       forecast_scalar empirically ≈ 13 for L=250
+    5. capped_forecast = clip(forecast, -20, +20)
+
+    Long the strongest cross-sectional performers; short the weakest.
+    Differs from absolute momentum: a flat-but-better-than-peers
+    instrument still gets a long forecast.
+  indicators_used:
+    - name: ROC
+      lookback_period: 250
+      formula_reference: "(close[t] / close[t-250]) - 1"
+      applied_to: close
+    - name: annualised_volatility
+      lookback_period: 25
+      formula_reference: "Stdev of daily price diffs annualised by sqrt(252)"
+      applied_to: "price differences"
+    - name: cross_sectional_mean
+      lookback_period: "Concurrent bar t"
+      formula_reference: "Mean of vol-normalised returns across all instruments at bar t"
+      applied_to: "vol-normalised return cross-section"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 13.0
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments — net cross-section is zero"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM"
+  sector_concentration_limits: "Net zero exposure to overall trend"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "250 bars + 25 vol"
+  benchmark: "Long-only diversified futures / Carver system"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade per Carver tests"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone modest; complementary to absolute trend"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Carver argues that for diversified futures, absolute and relative
+    momentum perform similarly OOS but capture overlapping signals.
+    Often used as a 'second leg' alongside absolute trend.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Lookback 60, 120, 500 days"
+  - "Within-asset-class demean (instead of universe-wide)"
+  - "Rank-based instead of mean-demean (top quartile long, bottom short)"
+  - "12-1 momentum (skip last month) per academic convention"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Default lookback 250 days (calendar year). 60/120/500 also tested.
+  - Vol-normalisation important — without it, equity-vol futures
+    swamp cross-section.
+  - Mean-demean is simple; Carver's blog also tests rank-based variants.
+look_ahead_bias_warnings: "Concurrent cross-sectional comparison at bar t — no look-ahead."
+survivorship_bias_warnings: "Negligible (futures with proper roll handling)."
+data_snooping_warnings: "Lookback length is the primary knob."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_assettrend_v1
+  - carver_ewmac_64_256_v1
+  - carver_carry_v1
+prerequisites: "Volatility-target overlay"

@@ -1,0 +1,159 @@
+# =============================================================================
+# ConnorsRSI Pullback — extreme oversold composite indicator strategy
+# =============================================================================
+
+strategy_id: connors_crsi_pullback_v1
+name: "ConnorsRSI Pullback Strategy"
+author: Larry Connors
+
+source:
+  type: paper
+  title: "An Introduction to ConnorsRSI / ConnorsRSI Pullbacks Guidebook"
+  chapter_or_url: "Connors Research Trading Strategy Series; PDFs publicly distributed (e.g., qmatix.com mirror, alvarezquanttrading.com mirror)"
+  publication_year: 2012
+  page_or_section: "Pullback strategy section"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: composite_oversold
+asset_class: [equities, etfs]
+specific_instruments: "Liquid US stocks above $5 with average daily dollar volume above thresholds; also liquid ETFs"
+timeframe: daily
+holding_period_typical: "2–8 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting all of:
+  - Listed on US exchanges
+  - close(t) > $5
+  - 21-day average dollar volume > $1,000,000 (default; raise for capacity)
+  Or any liquid ETF.
+liquidity_filter: "21-day avg(close * volume) > $1M"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Optional: exclude stocks within 1 day of earnings if available"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t
+    2. ADX(14) at bar t > 30                                    # trending environment
+    3. close(t) has fallen at least 4 of the last 5 bars OR close(t) < SMA(close, 5)
+    4. ConnorsRSI(3, 2, 100)[t] < 5                             # extreme oversold
+    5. No position currently open in this instrument
+
+    Where ConnorsRSI(rsi_period, streak_period, lookback_period) =
+      ( RSI(close, rsi_period)[t]
+      + RSI(streak, streak_period)[t]
+      + PercentRank(roc1, lookback_period)[t]
+      ) / 3
+    with:
+      - streak[t] = signed length of current up- or down-streak
+        (e.g., if close has risen for 3 consecutive days, streak=+3;
+         if fallen 2 days, streak=-2; if unchanged, 0)
+      - roc1[t] = (close[t] / close[t-1]) - 1
+      - PercentRank(x, n)[t] = 100 * (count of x[t-i], i in 1..n-1, < x[t]) / (n-1)
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: SMA
+      lookback_period: 5
+      formula_reference: simple
+      applied_to: close
+    - name: ADX
+      lookback_period: 14
+      formula_reference: "Wilder ADX (standard)"
+      applied_to: high_low_close
+    - name: ConnorsRSI
+      lookback_period: "(3, 2, 100)"
+      formula_reference: "Average of RSI(close,3), RSI(streak,2), PercentRank(roc1,100); see formula above"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10  # default for stock universe to allow ~10 concurrent positions
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10  # author commonly demos 10-position portfolio
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when ConnorsRSI(3,2,100) at bar t > 70"
+  stop_loss: None
+  time_stop: "Optional safety: 10-bar time stop if no exit signal fires"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Composite exit takes priority over time stop if present"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter on each name"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + 100 bars (PercentRank lookback) + 15 bars (ADX warmup)"
+  benchmark: "SPY"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5–10 bps for stocks; 5 bps for ETFs"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2001–2012 in original guidebook"
+  test_universe: "Liquid US stock universe and ETFs"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports ~75–80% win rate"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Several Connors Research guidebooks present variants on this template."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "ConnorsRSI(3,2,100) < 10 entry threshold (more frequent)"
+  - "Exit on ConnorsRSI > 50 (sooner)"
+  - "Drop ADX filter (broader signals)"
+  - "Add gap-down filter: today's close < yesterday's close - 1.5 * ATR(10)"
+  - "Apply to short side with symmetric thresholds (ConnorsRSI > 95 entry, < 30 exit)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Streak series s[t]: standard convention is
+       s[t] = s[t-1] + 1 if close[t] > close[t-1]
+              s[t-1] - 1 if close[t] < close[t-1]
+              0          if close[t] == close[t-1]
+    (Some implementations reset to ±1 on reversal rather than incrementing
+    from 0; both are documented in third-party charting platforms — use the
+    increment-from-zero convention by default.)
+  - PercentRank uses STRICTLY-LESS-THAN comparison; some platforms use
+    less-than-or-equal — affects edge cases.
+  - ADX>30 filter is for the *single name* (counter-intuitively used to
+    confirm a strong prevailing trend before fading); some reproductions
+    use ADX<25 instead. Default to author's >30.
+look_ahead_bias_warnings: "Close-of-day signal — same as RSI(2) caveat."
+survivorship_bias_warnings: "Material if applied to a survivorship-biased single-name universe; use point-in-time membership."
+data_snooping_warnings: "ConnorsRSI(3,2,100) parameters are author-defined defaults but were tuned from in-sample data; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_cumulative_rsi_v1
+  - connors_rsi25_75_v1
+  - connors_r3_v1
+prerequisites: None

@@ -1,0 +1,146 @@
+strategy_id: sinclair_variance_risk_premium_v1
+name: "Variance Risk Premium Harvesting (Short Volatility)"
+author: Euan Sinclair
+
+source:
+  type: book
+  title: "Volatility Trading (2nd ed)"
+  chapter_or_url: "Variance premium chapter"
+  publication_year: 2013
+  page_or_section: "VRP chapters"
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: variance_risk_premium_harvest
+asset_class: [options]
+specific_instruments: "SPX/SPY index options (most-cited demonstration); also major equity options"
+timeframe: monthly
+holding_period_typical: "30-45 days"
+direction: short_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid index options (SPX, SPY, NDX) and large-cap equity options where IV is consistently above RV"
+liquidity_filter: "Tight bid-ask, deep open interest"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Skip names with imminent earnings unless explicitly trading earnings premium"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Sinclair's central thesis: implied volatility is structurally
+    higher than subsequently realized volatility (the variance risk
+    premium / VRP). Short premium structures harvest this.
+
+    Setup:
+    1. Compute current IV (e.g., 30-day ATM IV) and 30-day rolling
+       realised volatility (RV) from underlying returns.
+    2. VRP_t = IV_t - RV_t      (typically 3-5% annualised on SPX)
+    3. Trade only when VRP_t > 0 (almost always for SPX);
+       optional filter: trade only when VRP_t > 5-year median.
+
+    Construction:
+    - Short ATM or slightly-OTM straddle, strangle, or variance swap
+      (variance swap is the cleanest VRP exposure but not retail-tradable).
+    - Delta-hedge daily (Sinclair's preferred form to isolate vol exposure).
+    - Hold to expiration OR close at predetermined PnL targets.
+
+    Sinclair emphasises that the VRP is so persistent that the
+    SPECIFIC option structure matters less than the size/timing
+    of the short-vol exposure.
+  indicators_used:
+    - name: implied_volatility
+      lookback_period: 1
+      formula_reference: "Black-Scholes IV at ATM strike for chosen DTE"
+      applied_to: "option chain"
+    - name: realized_volatility
+      lookback_period: 30
+      formula_reference: "Annualised stdev of daily log returns × sqrt(252) over last 30 days"
+      applied_to: returns
+    - name: VRP
+      lookback_period: 1
+      formula_reference: "IV - RV"
+      applied_to: "IV and RV series"
+  entry_price: market_or_limit
+  entry_time: "Monthly cycle aligned with option expirations"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: vega_or_notional_based
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Sinclair: size by VEGA exposure, not notional. Vega-target ~0.5-1% of equity per vol point."
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "50-75% of credit captured"
+  stop_loss: "2× credit received OR 21 DTE"
+  time_stop: "Hold to expiration if delta-hedging; 21-DTE management otherwise"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "PT → time stop → stop loss"
+  exit_price: market_or_limit
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Vol regime spike (e.g., VIX > 35): reduce or close positions"
+  market_regime_filter: "Optional: reduce size when VRP is near/below historical median"
+  correlation_limits: "Multiple short-vol positions are correlated"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "option chain history with IV"
+    - "underlying daily returns for RV"
+  data_frequency: daily
+  minimum_history_required: "5+ years for stable VRP estimation"
+  benchmark: "CBOE PUT, BXM, VRP indices"
+  starting_capital: 100000
+  commission_assumption: "Per-contract; multi-leg increases costs"
+  slippage_assumption: "1-2 cents per option leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade SPX history"
+  test_universe: "SPX, equity options"
+  cagr: "VRP harvest historically yields 5-10% annualised on SPX with significant tail risk"
+  sharpe: "Pre-2008 ~1.5; pre-2020 lower; tail events compress Sharpe"
+  max_dd: "Severe in vol-spike events (Feb 2018, Mar 2020, Oct 2008)"
+  win_rate: "70-80% of months profitable in normal regimes"
+  avg_win_loss_ratio: "Many small wins, occasional large losses"
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Sinclair's central insight: VRP is real, persistent, and
+    economically justified by risk-aversion. But tail events
+    (2008, 2020) mean naked short-vol can blow up. Tail-hedging
+    or strict position sizing is essential.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Short straddle delta-hedged daily"
+  - "Short strangle (defined risk via long wings)"
+  - "Iron condor (defined risk on both sides)"
+  - "Variance swap (institutional only)"
+  - "Tail-hedged short premium (see sinclair_tail_hedged_short_premium_v1)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Delta hedging frequency: daily is canonical; weekly is acceptable for
+    retail; intraday is hedging the gamma not the delta.
+  - 30-day RV vs 60-day vs 90-day: choice affects VRP measurement.
+    Sinclair uses 30-day in canonical.
+look_ahead_bias_warnings: "RV computed only from past returns; IV is current."
+survivorship_bias_warnings: "Negligible (index options)."
+data_snooping_warnings: "VRP is robust; no significant tunables."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - sinclair_iv_rv_gap_v1
+  - sinclair_tail_hedged_short_premium_v1
+  - sinclair_term_structure_premium_v1
+  - chan_volatility_term_structure_v1
+prerequisites: "Options trading authorization; ability to delta-hedge daily"

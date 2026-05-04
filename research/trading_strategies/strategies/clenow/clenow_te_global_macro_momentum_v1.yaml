@@ -1,0 +1,128 @@
+strategy_id: clenow_te_global_macro_momentum_v1
+name: "Trading Evolved — Global Macro Asset Class Momentum"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved"
+  chapter_or_url: "Asset-class rotation / global macro chapter; companion Zipline code"
+  publication_year: 2019
+  page_or_section: "Asset class momentum chapter"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: global_asset_class_rotation
+asset_class: [etfs]
+specific_instruments: |
+  Multi-asset ETF universe representing global macro exposures:
+  - US equities: SPY
+  - International equities: EFA (developed) and EEM (EM)
+  - Bonds: TLT (long Treasuries) and IEF (intermediate)
+  - Real estate: VNQ
+  - Commodities: GLD, DBC
+  - REITs / etc as user-defined
+timeframe: monthly
+holding_period_typical: "1 month minimum, often multiple months"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "User-defined global macro ETF basket spanning equities, bonds, REITs, commodities"
+liquidity_filter: "ETF AUM > $500M"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month:
+
+    1. For each ETF in the universe, compute 12-month total return:
+         return_12m = (close[t] / close[t-252]) - 1
+    2. Filter: keep only ETFs where return_12m > 0
+       (absolute momentum / dual-momentum-style filter)
+    3. Rank passing ETFs descending by return_12m
+    4. Buy the top N ETFs (Clenow's book example uses N=3)
+    5. Equal-weight allocation
+    6. If fewer than N pass the absolute-momentum filter, hold cash for
+       the remaining slots
+  indicators_used:
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1   (12-month total return)"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 33.33   # 100% / 3 if all 3 slots filled
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 3
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-rank rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-month re-evaluation"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Absolute momentum filter (return_12m > 0) acts as per-asset regime gate"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Asset-class diversification by ETF construction"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per ETF"
+  benchmark: "60% SPY / 40% IEF"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "3-5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book example"
+  test_universe: "Global macro ETF basket"
+  cagr: "Author shows decent returns with reduced drawdowns vs SPY"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Significantly less than SPY"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Standard 'dual momentum' construction — combines absolute and relative momentum for asset-class rotation."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top 1 (single best asset) — concentrated"
+  - "Top 5 (more diversified)"
+  - "12-1 momentum (skip last month) per academic convention"
+  - "Use safe-asset substitution (T-bill / SHY) when no ETFs pass abs-momentum filter"
+  - "Add risk-parity weighting instead of equal-weight"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 252 trading days = 1 calendar year approximation.
+  - 'Last trading day of month' uses NYSE calendar.
+  - If ETF history < 252 bars, exclude it from ranking that month.
+look_ahead_bias_warnings: "EOM signal, next-session open fill."
+survivorship_bias_warnings: "Some commodity / international ETFs were delisted; use point-in-time data."
+data_snooping_warnings: "12-month window is conventional; sweep 6/9/12 month robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_country_etf_rotation_v1
+  - alvarez_three_factor_etf_rotation_v1
+  - clenow_stocks_on_the_move_v1
+prerequisites: None

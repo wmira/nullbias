@@ -1,0 +1,167 @@
+strategy_id: gray_quant_value_v1
+name: "Quantitative Value (Full Screen)"
+author: Wesley Gray (with Tobias Carlisle)
+
+source:
+  type: book
+  title: "Quantitative Value: A Practitioner's Guide to Automating Intelligent Investment and Eliminating Behavioral Errors"
+  chapter_or_url: "Multiple chapters; alphaarchitect.com 'Quantitative Value Investing Philosophy' page"
+  publication_year: 2012
+  page_or_section: "Full process across the book"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: quant_value_multi_factor
+asset_class: [equities]
+specific_instruments: "US large- and mid-cap stocks"
+timeframe: monthly
+holding_period_typical: "1 year (annual rebalance) or quarterly"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - Listed on NYSE/AMEX/NASDAQ
+  - Market cap above 40th percentile of NYSE breakpoint (Gray's mid+ filter)
+  - Excluding financials and utilities
+  - close > $5
+liquidity_filter: "Mid-cap or larger via NYSE percentile breakpoint"
+fundamental_filter: "Excludes financials (banks, insurance) and utilities — non-comparable accounting"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Annual screening process (mid-year or year-end). The book lays out a
+    multi-step funnel:
+
+    Step 1 — Forensic accounting filter (avoid permanent loss):
+      Drop stocks failing ANY of:
+        a. Beneish M-Score > -1.78         (earnings manipulation)
+        b. Altman Z-Score < 1.81           (bankruptcy risk)
+        c. CFO < Net Income (large positive accruals)
+      Compute scores from latest annual financial statements.
+
+    Step 2 — Quality filter (Piotroski-style, 9-factor F-Score):
+      Compute F-Score (sum of 9 binary fundamental signals on profitability,
+      leverage/liquidity, operating efficiency).
+      Keep stocks with F-Score >= 7 (top tier; the book also tests >= 6).
+
+    Step 3 — Cheapness ranking:
+      Rank surviving universe descending by EBIT / EV
+      (higher = cheaper). EBIT = trailing 12-month operating income;
+      EV = market cap + total debt - cash.
+
+    Step 4 — Catalyst filter (optional):
+      Keep stocks in the cheapest decile that ALSO show positive
+      net insider buying or share buyback signals over the last 6 months.
+
+    Final portfolio: cheapest decile (top 50–100 names) of the surviving
+    universe by EBIT/EV. Equal-weighted.
+  indicators_used:
+    - name: Beneish_M_Score
+      lookback_period: "Trailing 12 months / latest fiscal period"
+      formula_reference: "8-variable model: M = -4.84 + 0.92*DSRI + 0.528*GMI + 0.404*AQI + 0.892*SGI + 0.115*DEPI - 0.172*SGAI + 4.679*TATA - 0.327*LVGI"
+      applied_to: "fundamentals"
+    - name: Altman_Z_Score
+      lookback_period: "Trailing 12 months"
+      formula_reference: "Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 1.0*X5 (working_cap/TA, retained_earnings/TA, EBIT/TA, market_cap/TL, sales/TA)"
+      applied_to: "fundamentals"
+    - name: Piotroski_F_Score
+      lookback_period: "Trailing 12 months / latest two fiscal periods"
+      formula_reference: "Sum of 9 binary signals: ROA>0, CFO>0, ΔROA>0, CFO>NI, Δleverage<0, Δcurrent_ratio>0, no share issuance, Δgross_margin>0, Δasset_turnover>0"
+      applied_to: "fundamentals"
+    - name: EBIT_EV
+      lookback_period: "TTM"
+      formula_reference: "trailing_12mo_EBIT / (market_cap + total_debt - cash_and_equivalents)"
+      applied_to: "fundamentals"
+    - name: insider_buying
+      lookback_period: 180
+      formula_reference: "Net insider buy/sell from Form 4 filings over last 6 months"
+      applied_to: "insider transactions"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new period at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2  # roughly 1/50 if 50 names; varies
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 50
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Annual or quarterly re-rank rebalance — exit names that fall out of cheapest decile"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Optional: cap any sector at 25%; book does not enforce strictly"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "fundamentals (income statement, balance sheet, cash flow)"
+    - "insider transactions"
+    - "market cap and price"
+  data_frequency: "annual / quarterly fundamentals; monthly returns"
+  minimum_history_required: "2 years of fundamentals for trend variables in F-Score"
+  benchmark: "S&P 500 / Russell 1000"
+  starting_capital: 100000
+  commission_assumption: "$0.005/share or $0 retail"
+  slippage_assumption: "10 bps for stocks"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1964-2011 in book (US data)"
+  test_universe: "US large+mid cap ex financials and utilities"
+  cagr: "Author reports ~17%+ CAGR for full QV vs ~10% for S&P 500"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Performance attribution by step (in book): cheapness alone ~16% CAGR; quality and forensic filters add modest improvement plus drawdown reduction."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop forensic filter (cheaper, slightly higher returns; higher tail risk)"
+  - "Drop quality filter (becomes pure EBIT/EV decile — see gray_ebit_ev_value_v1)"
+  - "Use EBITDA/EV or FCF/EV instead of EBIT/EV"
+  - "Apply to international universe (becomes the IVAL strategy)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Specific F-Score threshold (>=7 vs >=6) is documented in book; either
+    is supported. Default to >=7 (stricter).
+  - Sector exclusion (financials and utilities) is the book convention;
+    some implementations include them. Document the choice.
+  - Catalyst step is optional; book reports both.
+look_ahead_bias_warnings: |
+  - CRITICAL: Use point-in-time fundamentals lagged appropriately
+    (typically 3 months after fiscal year-end to ensure data availability).
+    Naive use of as-restated fundamentals creates major look-ahead bias.
+survivorship_bias_warnings: "Material — must include delisted stocks; backtest with point-in-time membership of major indexes."
+data_snooping_warnings: |
+  - Multi-step screen with several thresholds; in-sample tuning risk
+    is real. Original book reports OOS through 2011; OOS through 2024
+    has been weaker in some years.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_qval_etf_v1
+  - gray_magic_formula_v1
+  - gray_ebit_ev_value_v1
+prerequisites: None

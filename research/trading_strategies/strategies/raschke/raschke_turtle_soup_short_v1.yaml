@@ -1,0 +1,117 @@
+strategy_id: raschke_turtle_soup_short_v1
+name: "Turtle Soup (Short) — Failed 20-Day High Reversal"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts"
+  chapter_or_url: "Turtle Soup chapter; with Larry Connors"
+  publication_year: 1995
+  page_or_section: "Turtle Soup chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: failed_breakout_fade_short
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid daily-chart instruments"
+timeframe: daily
+holding_period_typical: "1-5 days"
+direction: short_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Same as turtle_soup_long"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Symmetric to turtle_soup_long but for failed UPSIDE breakouts.
+
+    Setup at bar t:
+    1. high(t) > max(high[t-20..t-1])     (new 20-day high today)
+    2. The previous 20-day high was at least 4 bars ago
+
+    Execution at bar t+1:
+    3. Place sell-stop at: previous_20_day_high - 5-10 ticks
+    4. Order good for one day only
+
+    Logic: failed upside breakouts trap bullish breakout traders.
+  indicators_used:
+    - name: rolling_max_high
+      lookback_period: 20
+      formula_reference: "max(high[t-20..t-1]) — exclusive of bar t"
+      applied_to: high
+  entry_price: stop_below_prior_20_day_high_minus_buffer
+  entry_time: "Day t+1 intraday if sell stop hit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position = (equity × 1%) / (stop - entry)"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Prior swing low"
+  stop_loss: "1-2 ticks above today's high (the failed-breakout high)"
+  time_stop: "5-bar time stop"
+  trailing_stop: "Optional: trail stop above 5-day high after 3 bars"
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Stop → time → target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "20 bars + 4-day spacing"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail; check borrow availability for shorts"
+  slippage_assumption: "5-15 bps for short-side equity trades"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995"
+  test_universe: "Futures, stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Short side typically has lower edge than long side because of structural up-drift in equities. Better on futures where directional drift is less."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "10-day or 30-day variants"
+  - "Turtle Soup Plus One"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Same as turtle_soup_long with sign flipped.
+  - Borrow availability is the main real-world friction on short-side
+    equity application.
+look_ahead_bias_warnings: "Same as long version."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Same as long version."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_turtle_soup_long_v1
+  - connors_mdu_v1
+prerequisites: "Short-selling authorization"

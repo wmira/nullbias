@@ -1,0 +1,131 @@
+strategy_id: chan_intraday_leveraged_etf_momentum_v1
+name: "Intraday Momentum on Leveraged ETFs (Trend Day)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Intraday momentum chapter; epchan.blogspot.com 'A leveraged ETFs strategy'"
+  publication_year: 2013
+  page_or_section: "Trend day chapter"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: intraday_leveraged_etf_rebalance
+asset_class: [etfs]
+specific_instruments: "Leveraged ETFs (TQQQ, SPXL, UPRO, TNA, SOXL on 3x; SSO, QLD on 2x; or stock index futures used as proxy)"
+timeframe: intraday_15min
+holding_period_typical: "Hours — entry at 14:15 ET, exit at close (15:55-16:00 ET)"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index leveraged ETFs"
+liquidity_filter: "Tight intraday bid-ask"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Single-day strategy. At 14:15 ET on each trading day:
+
+    1. Compute intraday return so far:
+         intraday_return_so_far = (close[t=14:15] / close[prior_day_close]) - 1
+    2. If intraday_return_so_far >= +2%:
+         BUY the leveraged ETF (or futures proxy) immediately
+    3. If intraday_return_so_far <= -2%:
+         SHORT the leveraged ETF (or buy inverse leveraged ETF)
+    4. Otherwise: no trade today
+
+    Logic: Leveraged ETFs must rebalance daily to maintain constant leverage.
+    On a strong-trend day, the rebalance creates buying (or selling) pressure
+    into the close that pushes the trend further. The strategy front-runs
+    the predictable rebalance flow.
+  indicators_used:
+    - name: intraday_return
+      lookback_period: "Same-day (close[14:15] vs prior_day_close)"
+      formula_reference: "(close_t / close_{previous_session_end}) - 1"
+      applied_to: "underlying index or ETF"
+  entry_price: market_at_14_15_ET
+  entry_time: "14:15 Eastern Time (intraday)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 50  # Aggressive — leveraged ETF is already 2-3x exposure
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Market-on-close exit (15:55-16:00 ET) — MANDATORY"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Time stop (close fill)"
+  exit_price: market_on_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: ["intraday minute or 15-min bars"]
+  data_frequency: intraday_15min
+  minimum_history_required: "1 day (no warmup needed)"
+  benchmark: "Buy-and-hold of underlying or cash"
+  starting_capital: 100000
+  commission_assumption: "Per-share or $0 retail"
+  slippage_assumption: "5-10 bps for ETFs intraday"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "June 2006 - July 2011 in original blog post"
+  test_universe: "DRN (real estate 3x), various leveraged ETFs"
+  cagr: "Author reported >100% annualised average in original test window"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — ±2% intraday move is rare, ~10-20 trades/year typical"
+  notes: |
+    Independent backtests since 2012 show the strategy is NOT robust OOS —
+    profits dissipated after Chan published. Likely victim of the
+    publication-then-arb cycle. Document but don't expect alpha at the
+    original parameters.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Lower entry threshold (1.5% or 1%) — more frequent trades"
+  - "Different entry time (13:30 or 14:30)"
+  - "Use 2x ETFs instead of 3x (less leverage decay)"
+  - "Apply to single-stock leveraged products"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Strategy requires intraday data (15-min bars minimum) which is
+    materially harder to obtain than daily OHLC.
+  - Leveraged ETFs have intra-day spread/decay; the strategy only works
+    if the trend continues into close.
+  - Entry-timing is critical — book uses 14:15 ET as the standard.
+look_ahead_bias_warnings: "Use precise timestamps — intraday strategies are sensitive to bar alignment."
+survivorship_bias_warnings: "Several leveraged ETFs have been delisted; backtest with delisted history."
+data_snooping_warnings: |
+  - 2% threshold is heuristic; OOS robustness is poor.
+  - This is a textbook example of a strategy that was real, was published,
+    and arbitraged away. Treat as illustrative more than tradable.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_overnight_gap_momentum_v1
+  - clenow_core_trend_v1
+prerequisites: "Intraday data feed; ability to trade leveraged ETFs intraday"

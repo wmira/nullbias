@@ -1,0 +1,168 @@
+strategy_id: clenow_stocks_on_the_move_v1
+name: "Stocks on the Move (Equity Momentum)"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Stocks on the Move: Beating the Market with Hedge Fund Momentum Strategies"
+  chapter_or_url: "Multiple chapters; followingthetrend.com 'Trading System Rules' page"
+  publication_year: 2015
+  page_or_section: "Trading rules chapter"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: equity_exponential_regression_momentum
+asset_class: [equities]
+specific_instruments: "S&P 500 constituents (point-in-time)"
+timeframe: weekly
+holding_period_typical: "Weeks to months — until rotated out by re-rank"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - S&P 500 membership at time of trade (point-in-time)
+liquidity_filter: "Implicit via S&P 500 membership"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: "Stocks with a >15% gap (single-day move) within the last 90 days are excluded from new buys"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Weekly evaluation, every Wednesday at the close (day arbitrary per
+    Clenow):
+
+    1. SPY close > SMA(SPY.close, 200)        (market regime gate; if false,
+                                               no NEW positions opened, but
+                                               existing positions held)
+    2. For each S&P 500 stock, compute volatility-adjusted momentum:
+         a. Take last 90 daily closes
+         b. Fit log-linear regression: log(close) ~ a + b × t
+            ⇒ annualised slope = exp(b × 252) - 1
+         c. R² of the regression
+         d. momentum_score = annualised_slope × R²
+    3. Filter out stocks with:
+         a. close < SMA(close, 100)                        (per-stock trend filter)
+         b. any single-day gap > 15% in the last 90 days   (gap filter)
+    4. Rank remaining stocks by momentum_score descending
+    5. Eligible buy set: top 20% (≈ top 100 of S&P 500)
+    6. Buy stocks in the eligible set with available cash
+       (after sells and rebalancing).
+  indicators_used:
+    - name: SMA (SPY)
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: SMA
+      lookback_period: 100
+      formula_reference: simple
+      applied_to: close
+    - name: exponential_regression_slope
+      lookback_period: 90
+      formula_reference: |
+        Fit OLS: y = a + b * x, where y = ln(close[t-89..t]) and x = 0..89.
+        Annualised slope = exp(b * 252) - 1.
+      applied_to: "log(close)"
+    - name: R_squared
+      lookback_period: 90
+      formula_reference: "Coefficient of determination of the same regression. R² = 1 - SSE/SST"
+      applied_to: "log(close) regression residuals"
+    - name: gap_filter
+      lookback_period: 90
+      formula_reference: "max over last 90 bars of |close[k] / close[k-1] - 1|. If > 0.15 anywhere, stock is excluded."
+      applied_to: close
+    - name: ATR
+      lookback_period: 20
+      formula_reference: "20-day Average True Range (Wilder)"
+      applied_to: high_low_close
+  entry_price: market_open_next_bar
+  entry_time: "Wednesday open (or arbitrary chosen day)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: atr_risk_parity
+  parameters:
+    risk_per_trade_pct: 0.001     # 10 basis points per ATR-day = Clenow's default
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: |
+    shares_to_buy[i] = (portfolio_value × 0.001) / ATR(close[i], 20)[t]
+    (i.e., a 1×ATR move contributes ~10 bps of portfolio P&L)
+  max_concurrent_positions: "Limited by available cash and by top-20% eligibility; typically 20-40 positions in practice"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: |
+    Sell at next session's open if ANY of:
+    - Stock falls out of top 20% momentum ranking
+    - close < SMA(close, 100)  (per-stock trend filter fails)
+    - Stock no longer in S&P 500
+  exit_priority: "Any trigger fires sale"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "SPY 200-SMA gate stops NEW buys; existing positions continue with their per-stock filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 100 bars + 90 bars regression = 200 bars effectively"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0.005/share or $0 retail"
+  slippage_assumption: "5-10 bps for stocks"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1999–2014 in original book"
+  test_universe: "S&P 500 with point-in-time membership"
+  cagr: "Author reports ~12% CAGR"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Author reports ~26% — substantially less than SPY's drawdowns"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Reduces drawdowns relative to SPY by gating new entries with the SPY 200-SMA filter."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top 10% (top 50) instead of top 20% — more concentrated"
+  - "Daily rebalance instead of weekly"
+  - "Use Russell 1000 or 3000 universe"
+  - "Add long/short variant — short bottom 20% momentum (see clenow_stocks_on_move_long_short_v1)"
+  - "Replace 90-day exp regression with 12-1 momentum (academic standard)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Annualised slope': Clenow uses exp(daily_b × 252) - 1, i.e., compounded.
+    Some implementations use simply daily_b × 252; the difference is small
+    for typical slopes but matters for very high momentum stocks.
+  - R² is multiplied as a smoothness adjustment — penalises stocks with
+    erratic price action even if their slope is high.
+  - 'Top 20%' rebalanced weekly: stocks dropping out of top 20% are sold
+    next session; new top-20% stocks are bought with available cash.
+  - Wednesday is canonical but arbitrary — author explicitly says any day.
+look_ahead_bias_warnings: |
+  - Use Wednesday close to compute momentum, fill at Thursday open.
+  - Naive backtests sometimes use Wednesday close for both compute AND fill,
+    which is acceptable approximation but not live-tradable.
+survivorship_bias_warnings: "MATERIAL — must use point-in-time S&P 500 membership; results inflated significantly by survivorship bias."
+data_snooping_warnings: "90-day window and 20% cutoff are heuristic; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_stocks_on_move_long_short_v1
+  - alvarez_monthly_sp500_rotation_ranking_v1
+  - alvarez_weekly_sp500_meanrev_rotation_v1
+  - carver_relmomentum_v1
+prerequisites: None

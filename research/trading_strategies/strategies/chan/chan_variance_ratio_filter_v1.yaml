@@ -1,0 +1,133 @@
+strategy_id: chan_variance_ratio_filter_v1
+name: "Variance Ratio Test Regime Filter"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Mean reversion testing chapter"
+  publication_year: 2013
+  page_or_section: "Variance ratio chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: regime_filter_overlay_statistical
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any series — used as REGIME OVERLAY"
+timeframe: daily
+holding_period_typical: "N/A — overlay"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Underlying strategy's universe"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY rule — provides STATISTICAL test of mean-reversion vs random
+    walk vs trending behaviour.
+
+    Variance Ratio (VR) statistic:
+
+    For lag τ (typical τ = 2, 5, 10, 20):
+      VR(τ) = Var[z_t - z_{t-τ}] / (τ × Var[z_t - z_{t-1}])
+      where z_t = log price
+
+    Interpretation:
+      VR(τ) ≈ 1 → random walk (efficient)
+      VR(τ) < 1 → mean-reverting (variance grows slower than τ)
+      VR(τ) > 1 → trending (variance grows faster than τ)
+
+    Statistical significance via Lo-MacKinlay test statistic which is
+    approximately N(0, 1) under null of random walk.
+
+    Application as overlay:
+      Compute rolling VR(τ) over last 252 bars
+      If VR < 0.95 AND p-value < 0.05 (significantly mean-reverting):
+        enable mean-reversion strategies
+      If VR > 1.05 AND p-value < 0.05 (significantly trending):
+        enable trend-following strategies
+      Else: hold cash / no new entries
+  indicators_used:
+    - name: variance_ratio
+      lookback_period: 252
+      formula_reference: "Lo-MacKinlay variance ratio test. Implementation: arch.unitroot.VarianceRatio (Python arch library)"
+      applied_to: "log returns or log prices"
+  entry_price: per_underlying_strategy
+  entry_time: "Close-of-day evaluation"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Filter doesn't size positions; gates entries"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: "Regime flip can disable trading"
+  exit_priority: "Per underlying"
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "This IS the regime filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars + 4× max(τ) for proper stability"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple windows"
+  test_universe: "Various series"
+  cagr: NOT_SPECIFIED
+  sharpe: "Improves underlying strategy Sharpe by gating wrong-regime trades; comparable to Hurst filter"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Variance ratio test is the formal statistical hypothesis test corresponding to the Hurst exponent's descriptive statistic. Use VR for significance testing; use Hurst for intuition."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use heteroscedasticity-robust VR test (Lo-MacKinlay 1989)"
+  - "Multi-lag joint VR test"
+  - "Combine VR with ADF and Hurst for triple-confirmation regime"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Choice of τ: longer τ tests longer-horizon mean reversion. Use
+    multiple τ for robustness.
+  - p-value thresholds 0.05 conventional; 0.10 for less strict.
+  - Sample size matters — VR tests on <100 bars are unreliable.
+look_ahead_bias_warnings: "Compute VR only from past data."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "Threshold choices."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_hurst_regime_filter_v1
+  - chan_bollinger_meanrev_v1
+  - chan_pairs_engle_granger_v1
+prerequisites: "Underlying strategy to overlay"

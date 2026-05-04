@@ -1,0 +1,126 @@
+strategy_id: longmore_index_rebalance_v1
+name: "Index Rebalance Flow Front-Running"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Robot Wealth index-rebalance research; bootcamp materials"
+  chapter_or_url: "robotwealth.com bootcamp + Edge Database"
+  publication_year: 2020
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: index_inclusion_flow_anticipation
+asset_class: [equities]
+specific_instruments: "Stocks scheduled for index inclusion (S&P 500 add) or deletion (S&P 500 drop)"
+timeframe: daily
+holding_period_typical: "1-2 weeks around announcement and effective date"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Stocks listed for upcoming index changes (S&P 500, Russell 1000/2000 reconstitutions)"
+liquidity_filter: "Adequate volume"
+fundamental_filter: "Tracked via index committee announcements"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    When a stock is announced for index addition, ETF/index funds tracking
+    that index must buy by the effective date. Their flow is price-insensitive
+    — front-running this flow has positive expected return.
+
+    For each announced INCLUSION:
+    1. Note announcement date T_a (e.g., S&P committee announcement)
+    2. Note effective date T_e (typically several trading days later)
+    3. ENTER LONG at the close of T_a (front-run the buying flow)
+    4. EXIT at the close of T_e or 1-2 days after
+
+    For DELETIONS — symmetric SHORT (or just avoid).
+
+    Russell rebalance is annual (June) and produces large, predictable
+    flows. Quarterly S&P committee changes produce smaller but also
+    tradable flows.
+  indicators_used:
+    - name: index_change_announcement
+      lookback_period: 1
+      formula_reference: "Index committee announcements (S&P, Russell, MSCI); track via news / Bloomberg"
+      applied_to: NOT_APPLICABLE
+  entry_price: close_signal_bar
+  entry_time: "Close of announcement day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Equal-dollar across all simultaneously-announced changes"
+  max_concurrent_positions: "Limited by simultaneous announcements"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: NOT_SPECIFIED
+  stop_loss: "2 × ATR(20) protection"
+  time_stop: "Effective date + 1 day"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Time stop dominant"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "Several rebalance cycles"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10-20 bps (volume on these names spikes)"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade academic literature on index effect"
+  test_universe: "S&P 500 / Russell additions and deletions"
+  cagr: NOT_SPECIFIED
+  sharpe: "Sharpe of dedicated index-effect funds historically 1.5-2.0; degraded post-2010 as more participants front-run"
+  max_dd: NOT_SPECIFIED
+  win_rate: "Historically 60-70%"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — quarterly cadence; occasional ad-hoc"
+  notes: |
+    Edge has compressed materially as quants front-run; 1990s/2000s edge of
+    several percent on each addition has shrunk to fractional percent.
+    Russell reconstitution still produces sizable flows.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Trade pre-announcement (rumor-based, riskier)"
+  - "Trade Russell only (largest flows)"
+  - "Hedge with index futures to isolate idiosyncratic component"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Announcement vs effective date sometimes 5-10 trading days apart;
+    optimal entry timing within this window is empirical.
+  - Liquidity-impact: small accounts can trade easily; large sizes
+    move price.
+look_ahead_bias_warnings: "Use ANNOUNCEMENT date, not effective date, for signal."
+survivorship_bias_warnings: "Material — historical adds/deletes must include all events."
+data_snooping_warnings: "Edge degrades with publication; validate OOS."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_overnight_gap_momentum_v1
+  - longmore_turn_of_month_v1
+prerequisites: "Index committee data feed; ability to trade event-driven"

@@ -1,0 +1,124 @@
+strategy_id: clenow_te_carry_v1
+name: "Trading Evolved — Futures Carry Strategy"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved"
+  chapter_or_url: "Carry strategy chapter; companion Zipline futures code"
+  publication_year: 2019
+  page_or_section: "Carry chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: futures_carry
+asset_class: [futures]
+specific_instruments: "Diversified futures with valid carry: rates, FX, energy, metals, equities"
+timeframe: daily
+holding_period_typical: "Months — low turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures across asset classes with two simultaneously tradable expiries"
+liquidity_filter: "Both contract months sufficiently liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Cross-sectional carry: long highest carry, short lowest carry.
+
+    1. For each instrument, compute annualised carry:
+         carry = (P_front - P_next) / P_next × (12 / months_between)
+       (sign convention: positive carry = backwardation = long-favorable)
+    2. Smooth: carry_smooth = SMA(carry, 30)
+    3. Cross-sectional rank by carry_smooth descending
+    4. Long top 25%, short bottom 25% of the cross-section, dollar-neutral
+    5. Position sizing within each leg: equal-weight or vol-targeted (see
+       Clenow's discussion in the chapter)
+  indicators_used:
+    - name: term_structure_carry
+      lookback_period: "1 day (point-in-time)"
+      formula_reference: "(P_front - P_next) / P_next × (12 / months_between_contracts)"
+      applied_to: "futures front and next contract prices"
+    - name: SMA
+      lookback_period: 30
+      formula_reference: simple
+      applied_to: "carry series"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day; rebalance monthly or weekly"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight_long_short
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "1 / (number of long names) for long leg; same for short"
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: "Top 25% long, bottom 25% short"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Periodic re-rank rebalance (monthly or weekly)"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop only"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Within asset class, multiple long names tend to be correlated — diversification across asset classes recommended"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "30 bars smoothing"
+  benchmark: "BTOP50 / cash"
+  starting_capital: "$1M+ for futures"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Diversified futures with valid carry"
+  cagr: "Author reports modest standalone Sharpe; primary value is low correlation with trend"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Cross-sectional carry distinguished from outright (each-instrument) carry as in carver_carry_v1."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top-3 / bottom-3 instead of quartile"
+  - "Within-asset-class carry rather than cross-asset"
+  - "Combine with absolute filter (long only positive carry, short only negative)"
+  - "FX-only carry: G10 currencies"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Cross-sectional means ALL instruments compared against each other.
+    Within-asset-class is a documented variant.
+  - Sign convention: positive carry = backwardation = long-favorable.
+  - 30-day smoothing is the book default; the Carver carry rule uses
+    60-day — both are reasonable.
+look_ahead_bias_warnings: "Standard close-of-day signal."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Quartile and smoothing window are heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_carry_v1
+  - clenow_te_curve_trading_v1
+prerequisites: None

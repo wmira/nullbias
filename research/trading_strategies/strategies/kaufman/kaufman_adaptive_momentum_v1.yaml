@@ -1,0 +1,121 @@
+strategy_id: kaufman_adaptive_momentum_v1
+name: "Adaptive Momentum (ER-Modulated Lookback)"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Trading Systems and Methods"
+  chapter_or_url: "Adaptive momentum chapter"
+  publication_year: 1987
+  page_or_section: "Adaptive momentum chapter"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: adaptive_lookback_momentum
+asset_class: [equities, etfs, futures]
+specific_instruments: "Liquid instruments"
+timeframe: daily
+holding_period_typical: "Weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid daily instruments"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Momentum lookback adapts to ER:
+    1. Compute base ER over 10 days.
+    2. Adaptive lookback N:
+         N = round(min_period + (max_period - min_period) × (1 - ER))
+       e.g., min=10, max=60: high-ER (trending) → N≈10, low-ER (choppy) → N≈60
+    3. Compute momentum: ROC = (close[t] / close[t-N]) - 1
+    4. Long when ROC > 0; short when ROC < 0.
+
+    Logic: in trending markets, fast momentum captures recent move;
+    in choppy markets, slow momentum smooths out noise. Adaptive
+    period combines both.
+  indicators_used:
+    - name: efficiency_ratio
+      lookback_period: 10
+      formula_reference: "Standard ER formula"
+      applied_to: close
+    - name: ROC
+      lookback_period: "adaptive (10-60 based on ER)"
+      formula_reference: "(close[t] / close[t-N_adaptive]) - 1"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "2 × ATR(20)"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: NOT_SPECIFIED
+  signal_reversal: "ROC crosses zero"
+  exit_priority: "Stop → ROC reversal"
+  exit_price: market
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into adaptive lookback"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "60 bars (max adaptive lookback)"
+  benchmark: "Underlying"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Stocks and futures"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Generalisation of KAMA logic to momentum measure."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different min/max periods (5-30, 20-100)"
+  - "Use volatility instead of ER for adaptation"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Round(N) as integer required for indexing into close series.
+  - ER mapping linear; could use power function for non-linear adaptation.
+look_ahead_bias_warnings: "Standard."
+survivorship_bias_warnings: "Per universe."
+data_snooping_warnings: "Adaptation function tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - kaufman_kama_trend_v1
+  - kaufman_efficiency_ratio_filter_v1
+  - clenow_stocks_on_the_move_v1
+prerequisites: None

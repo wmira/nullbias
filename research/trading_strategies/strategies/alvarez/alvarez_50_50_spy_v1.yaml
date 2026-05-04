@@ -1,0 +1,124 @@
+strategy_id: alvarez_50_50_spy_v1
+name: "50/50 SPY Strategy"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "The 50/50 SPY Strategy"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/the-50-50-spy-strategy/"
+  publication_year: 2018
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: regime_aware_leverage
+asset_class: [etfs]
+specific_instruments: "SPY, SSO (2x SPY), TLT (or other bond)"
+timeframe: daily
+holding_period_typical: "While in regime"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Three-asset rotation: SPY, SSO, TLT"
+liquidity_filter: "Implicit — all liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation at the close:
+
+    Bull regime: close_SPY > SMA(close_SPY, 200)
+      Allocation in bull regime:
+        - 50% of equity in SPY  (1x exposure on half of capital)
+        - 50% of equity in SSO  (2x exposure on half of capital ⇒ effective ~1.5x portfolio)
+      Effectively this gives ~150% net SPY exposure with leverage
+      concentrated in SSO.
+
+    Bear regime: close_SPY <= SMA(close_SPY, 200)
+      Allocation in bear regime:
+        - 100% of equity in TLT (or SHY if author's variant)
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+  entry_price: market_open_next_bar
+  entry_time: "Next session open after regime change"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: regime_dependent_split
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "50/50 split in bull; 100% in bear"
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 2     # in bull regime: SPY + SSO held together
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Continuous regime evaluation"
+  trailing_stop: None
+  signal_reversal: "Regime flip triggers full reallocation"
+  exit_priority: "Single rule"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into entry"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA)"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps per fill"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2018"
+  test_universe: "SPY/SSO/TLT"
+  cagr: "Higher than SPY buy-and-hold due to leverage in bull regime"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Lower than SPY buy-and-hold per author"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — only on regime flips"
+  notes: |
+    The 50/50 split with SSO is a leverage-management compromise: avoids the
+    decay risk of going 100% SSO while still capturing more upside than 100%
+    SPY. The TLT bear allocation has the 2022 failure-mode caveat.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "60/40 SPY/SSO split"
+  - "100% SSO bull / 100% SHY bear"
+  - "Add 21-DTE smoothing on the regime flag (avoid whipsaws)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - The exact bull-allocation split (50/50 SPY/SSO) is the post's
+    namesake configuration; other splits are listed under variations.
+  - Regime evaluated daily but allocation only changes when regime
+    flips. Avoid daily rebalancing of the 50/50 split unless drift
+    exceeds a threshold; keep simple by only re-balancing on flip.
+look_ahead_bias_warnings: "Daily close signal; same-day fill is acceptable as approximation, next-open is more conservative."
+survivorship_bias_warnings: "None — three liquid ETFs."
+data_snooping_warnings: "Split ratio (50/50) is heuristic but not over-fit."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_spy_sso_tlt_v1
+  - alvarez_spy_tlt_rotation_v1
+prerequisites: None

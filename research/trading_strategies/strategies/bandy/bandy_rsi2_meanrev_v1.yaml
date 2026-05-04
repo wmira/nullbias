@@ -1,0 +1,121 @@
+strategy_id: bandy_rsi2_meanrev_v1
+name: "Bandy RSI(2) Mean Reversion (Short Holding Period)"
+author: Howard Bandy
+
+source:
+  type: book
+  title: "Mean Reversion Trading Systems: Practical Methods for Swing Trading"
+  chapter_or_url: "Multiple chapters; Blue Owl Press 2013"
+  publication_year: 2013
+  page_or_section: "RSI mean reversion chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: oversold_pullback_short_holding
+asset_class: [equities, etfs]
+specific_instruments: "Liquid US equity ETFs and major equities"
+timeframe: daily
+holding_period_typical: "1-2 days (Bandy's documented sweet spot)"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity ETFs (SPY, QQQ, IWM, sector ETFs) and large-cap stocks"
+liquidity_filter: "Adequate volume; ETF AUM > $1B preferred"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation:
+    1. close(t) > SMA(close, 200)
+    2. RSI(close, 2)[t] < 10
+    3. No position currently open
+
+    Bandy emphasises trading FREQUENTLY with short holding — the RSI(2)
+    < 10 threshold (vs Connors' < 5) generates more signals while
+    maintaining edge.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Bandy advocates FIXED position sizing for system-health diagnostics"
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when RSI(close, 2) crosses up through 65-75 range, OR when z_score(close, 8) crosses above 1"
+  stop_loss: None
+  time_stop: "2-bar time stop (Bandy's documented sweet spot is 1-2 days)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "RSI exit → time stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Bandy's 'health check' methodology: stop trading when equity-curve T-test indicates broken system"
+  market_regime_filter: "Built into 200-SMA filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 30 RSI warmup"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-2013 in book"
+  test_universe: "Major ETFs and stocks"
+  cagr: "Modest standalone CAGR; high frequency of trades"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author claims 70%+ win rate"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "High — frequent trading is part of the strategy"
+  notes: "Bandy's 'sweet spot' analysis identified 1-2 day holds as optimal — longer holds dilute the edge."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "RSI(2) < 5 (stricter, fewer trades)"
+  - "RSI(3) < 30 (longer-period RSI variant)"
+  - "Combine with z-score exit instead of RSI exit"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Z-score lookback 8 with threshold 1 is documented as Bandy's
+    preferred exit; encoded as alternative.
+  - 1-2 day hold is Bandy's empirical finding; some variants extend
+    to 3-5 days for less liquid instruments.
+look_ahead_bias_warnings: "Same-day close fill assumed; live MOC or T+1 entry."
+survivorship_bias_warnings: "Material on stock universe."
+data_snooping_warnings: "RSI thresholds heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_zscore_meanrev_v1
+  - bandy_bollinger_meanrev_v1
+  - connors_rsi2_v1
+prerequisites: None

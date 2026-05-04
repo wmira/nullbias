@@ -1,0 +1,134 @@
+strategy_id: gray_dual_momentum_aa_v1
+name: "Dual Momentum (Alpha Architect Variant)"
+author: Wesley Gray (Alpha Architect; following Antonacci)
+
+source:
+  type: blog_post
+  title: "A Tactical Asset Allocation Horserace: Robust Asset Allocation vs Dual Momentum"
+  chapter_or_url: "https://alphaarchitect.com/asset-allocation-horserace-robust-asset-allocation-raa-vs-dual-momentum/"
+  publication_year: 2015
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: dual_momentum_global_equity
+asset_class: [etfs]
+specific_instruments: "SPY (US equities), EFA/VEU (international equities), AGG/IEF (bonds)"
+timeframe: monthly
+holding_period_typical: "Months — until regime shift"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "3-asset universe: US equities, intl equities, bonds (safe asset)"
+liquidity_filter: "Implicit (major ETFs)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month:
+
+    Step 1 — Relative momentum: which equity index has higher 12-month return?
+      us_return_12m   = (close_SPY[t] / close_SPY[t-252]) - 1
+      intl_return_12m = (close_EFA[t] / close_EFA[t-252]) - 1
+      winning_equity = SPY if us_return_12m > intl_return_12m else EFA
+
+    Step 2 — Absolute momentum: is the winning equity outperforming T-Bills?
+      excess_return_winner = winning_equity_return_12m - t_bill_return_12m
+
+      If excess_return_winner > 0:
+        allocate 100% to the winning equity index
+      Else:
+        allocate 100% to the safe asset (AGG / IEF / cash)
+
+    Re-evaluate monthly.
+  indicators_used:
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1"
+      applied_to: close
+    - name: t_bill_return
+      lookback_period: 252
+      formula_reference: "Cumulative T-Bill return over 12 months"
+      applied_to: "T-Bill series"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_into_single_asset
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation"
+  trailing_stop: None
+  signal_reversal: "Per-month"
+  exit_priority: "Single rule"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into absolute momentum step"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per asset"
+  benchmark: "60/40, equal-weight asset basket"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade — Alpha Architect's RAA-vs-Dual Momentum horserace"
+  test_universe: "US equity, intl equity, bonds"
+  cagr: "Comparable to RAA over multi-decade period"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Reduced vs buy-and-hold; comparable to RAA"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — couple of regime flips per year"
+  notes: |
+    Alpha Architect's research finds RAA and Dual Momentum produce
+    similar outcomes; the choice between them is largely about
+    implementation simplicity and regime-shift behavior.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "More than 2 equity indexes (multi-country relative momentum)"
+  - "Add more safe-asset granularity (e.g., long bonds vs short bonds)"
+  - "Use 6-month look-back instead of 12"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Antonacci's original Dual Momentum uses the same construction; this
+    YAML codifies Alpha Architect's variant which is essentially the
+    same with their preferred ETF mapping.
+  - Tied 12-month returns: use the asset that outperformed the *last
+    month* as tie-breaker, OR keep current position to minimise turnover.
+look_ahead_bias_warnings: "EOM signal, next-open fill."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "12-month window academic-standard."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_robust_asset_allocation_v1
+  - gray_tmom_v1
+  - gray_ma12_trend_v1
+  - alvarez_country_etf_rotation_v1
+prerequisites: None

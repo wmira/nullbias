@@ -1,0 +1,129 @@
+strategy_id: carver_acceleration_v1
+name: "Acceleration (EWMAC of EWMAC Forecast)"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Advanced Futures Trading Strategies"
+  chapter_or_url: "AFTS Strategy 23 (Acceleration); GitHub majkong14/advanced-futures-notes"
+  publication_year: 2023
+  page_or_section: "Strategy 23 chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: trend_acceleration
+asset_class: [futures]
+specific_instruments: "Diversified futures universe"
+timeframe: daily
+holding_period_typical: "Days to weeks; medium turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures contracts"
+liquidity_filter: "Standard cost filter (similar to medium-fast EWMAC)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Acceleration is the change in trend strength: rising forecast = trend
+    accelerating, falling forecast = trend decelerating. Computed as:
+
+    1. Compute base_forecast = vol-normalised EWMAC(L_fast, L_slow)
+       (default speeds 16, 64; before forecast scalar)
+    2. acceleration_raw = base_forecast[t] - base_forecast[t-N]
+       where N = a chosen acceleration window. Carver default N = 4 days.
+    3. forecast = acceleration_raw × forecast_scalar
+       forecast_scalar (acceleration of EWMAC(16,64), N=4) empirically ≈ 100
+    4. capped_forecast = clip(forecast, -20, +20)
+
+    Long when EWMAC forecast is RISING (positive trend gaining strength).
+    Short when EWMAC forecast is FALLING.
+  indicators_used:
+    - name: EWMAC_raw
+      lookback_period: "(16, 64)"
+      formula_reference: "Vol-normalised EWMAC pre-scalar"
+      applied_to: close
+    - name: difference
+      lookback_period: 4
+      formula_reference: "x[t] - x[t-4]"
+      applied_to: "raw EWMAC forecast series"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 100.0
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM"
+  sector_concentration_limits: "FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "Same as base EWMAC (~64 bars + vol seed) + 4 bars for acceleration"
+  benchmark: "Carver diversified system / BTOP50"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years through 2023"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone modest; correlation with EWMAC(2,8) is high — captures similar fast signals"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Useful as a fast trend-confirming overlay in combinations with slower
+    rules; less unique in standalone use.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different base EWMAC speed (e.g., (4,16))"
+  - "Acceleration window 2, 8 days"
+  - "Second derivative — acceleration of acceleration"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Acceleration' is FIRST DIFFERENCE of the EWMAC forecast series.
+    Some implementations use the second derivative of price; document
+    the chosen interpretation.
+  - Carver's preferred form uses the EWMAC forecast difference.
+look_ahead_bias_warnings: "Same as EWMAC family."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Empirical evidence in Carver's testing is weaker than EWMAC/carry; OOS robustness is the open question."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_2_8_v1
+  - carver_ewmac_16_64_v1
+prerequisites: "Volatility-target overlay"

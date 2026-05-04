@@ -1,0 +1,136 @@
+strategy_id: raschke_anti_v1
+name: "The 'Anti' Pattern — Stochastic First-Pullback Continuation"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts: High Probability Short-Term Trading Strategies"
+  chapter_or_url: "Anti chapter; LBR Group educational content"
+  publication_year: 1995
+  page_or_section: "Anti pattern chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: stochastic_first_pullback_continuation
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid trending instruments"
+timeframe: daily
+holding_period_typical: "Days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Any liquid instrument that has just completed a strong impulse move"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Pre-conditions:
+    1. A short-term IMPULSE move has just occurred (clear directional thrust)
+    2. Stochastic oscillator with parameters (7, 10, 4):
+       %K period = 7, %D period = 10, smoothing = 4
+
+    LONG entry (after up-impulse):
+    1. Slow stochastic line (%D) sloping DOWN — pullback in progress
+    2. Fast line (%K) hooks BACK UP through the slow line
+    3. Both lines moving in same direction (up) at the candle close
+    4. Buy at next bar's open (or on stop above signal bar high)
+
+    SHORT entry — symmetric: after a down-impulse, %D sloping up, %K hooks
+    back down, enter short at next bar.
+
+    Trade direction matches the prior IMPULSE — the Anti is a CONTINUATION
+    pattern (its name 'Anti' refers to the counter-stochastic-direction
+    re-entry, not to counter-trend trading).
+  indicators_used:
+    - name: stochastic_K
+      lookback_period: 7
+      formula_reference: "%K = 100 × (close - lowest_low_7) / (highest_high_7 - lowest_low_7); raw fast %K"
+      applied_to: high_low_close
+    - name: stochastic_D
+      lookback_period: 10
+      formula_reference: "%D = SMA(%K, 10)"
+      applied_to: "%K series"
+    - name: stochastic_smooth
+      lookback_period: 4
+      formula_reference: "Additional SMA smoothing of %K (TC2000-style 'smoothed %K')"
+      applied_to: "%K series"
+  entry_price: market_at_open_or_stop
+  entry_time: "Next bar after signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position size = (equity × 1%) / stop distance"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Prior swing high (long) / swing low (short)"
+  stop_loss: "Below pullback low (long) / above pullback high (short)"
+  time_stop: "Exit if no follow-through within 3-5 bars"
+  trailing_stop: NOT_SPECIFIED
+  signal_reversal: "Stochastic crosses back against position"
+  exit_priority: "Stop → time stop → swing-high target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Pre-condition (impulse must have just occurred) acts as filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "20 bars stochastic warmup"
+  benchmark: "Underlying buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995"
+  test_universe: "Stocks, futures"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "One of Raschke's most-taught patterns. Pattern-recognition based — coding it cleanly requires defining 'impulse' and 'first pullback' mechanically."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different stochastic settings (5,3,3 standard)"
+  - "Combine with 3-10 oscillator confirmation"
+  - "Apply on 60-min or 240-min charts"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Impulse' definition is qualitative in the book. Mechanical proxy:
+    a single bar move > 1.5 × ATR(20), or 3 consecutive bars in same
+    direction.
+  - Stochastic '7,10,4' is Raschke's signature setting. (The standard
+    %K=14, %D=3 doesn't trigger the same patterns.)
+  - 'Hook' is a directional change in the fast line — mechanically:
+    %K[t] > %K[t-1] AND %K[t-1] < %K[t-2] (for long entry).
+look_ahead_bias_warnings: "Same-day signal; same-day or next-bar fill."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Subjective elements ('impulse') invite curve-fitting; encode mechanically and test OOS."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_holy_grail_v1
+  - raschke_3_10_oscillator_v1
+prerequisites: None

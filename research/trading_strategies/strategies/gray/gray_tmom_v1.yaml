@@ -1,0 +1,126 @@
+strategy_id: gray_tmom_v1
+name: "Time-Series Momentum (TMOM) — Absolute Momentum Rule"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: blog_post
+  title: "Avoiding the Big Drawdown with Trend-Following Investment Strategies / Alpha Architect on Momentum & Trend Following Rules"
+  chapter_or_url: "https://alphaarchitect.com/wp-content/uploads/2021/08/Avoiding_the_Big_Drawdown_with_Trend-Following_Investment_Strategies.pdf ; awealthofcommonsense.com/2015/09 reference"
+  publication_year: 2015
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: time_series_absolute_momentum
+asset_class: [etfs]
+specific_instruments: "Single risky asset (e.g., SPY) with safe-asset substitution (T-Bills / SHY)"
+timeframe: monthly
+holding_period_typical: "Months — until regime shift"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "One risky asset (e.g., SPY) and one safe asset (T-Bill or SHY)"
+liquidity_filter: "Implicit"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+
+    1. Compute total_return_12m for the risky asset:
+         total_return_12m = (close[t] / close[t-252]) - 1
+    2. Compute t_bill_return_12m (or use proxy: SHY return over same period)
+    3. excess_return = total_return_12m - t_bill_return_12m
+    4. If excess_return > 0:
+         go long risky asset (100% allocation)
+       Else:
+         hold safe asset (T-Bills / SHY)
+
+    Re-evaluate monthly.
+  indicators_used:
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1   (12-month total return)"
+      applied_to: close
+    - name: t_bill_return
+      lookback_period: 252
+      formula_reference: "Cumulative return of T-Bill / SHY proxy over same window"
+      applied_to: "T-Bill series"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_into_single_asset
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation"
+  trailing_stop: None
+  signal_reversal: "Switch to safe asset if excess_return < 0"
+  exit_priority: "Single rule"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into the rule"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars"
+  benchmark: "Buy-and-hold of the risky asset"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in research"
+  test_universe: "SPY and major equity indexes"
+  cagr: "Modest reduction vs buy-and-hold; primary value is drawdown reduction"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Significantly less than buy-and-hold (e.g., ~20% vs 50%+)"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — typically 1-3 regime flips per year"
+  notes: "Used as a building block in the Robust Asset Allocation framework (50% TMOM + 50% MA = ROBUST trend trigger)."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use absolute return > 0 instead of excess return > t-bill (simpler, similar results)"
+  - "6-month or 9-month lookback instead of 12"
+  - "Apply per-asset across multi-asset universe (each asset goes risk-on or risk-off independently)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Excess-return version uses T-Bill total return as the hurdle.
+    Some implementations use simple 'return > 0' (absolute momentum).
+    Difference is small unless rates are high.
+  - 'Hold safe asset' typically means SHY or cash (T-Bill).
+look_ahead_bias_warnings: "EOM signal, next-open fill — clean."
+survivorship_bias_warnings: "None (single asset)."
+data_snooping_warnings: "12-month window is academic-standard but slightly tuned in cross-section."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_ma12_trend_v1
+  - gray_robust_asset_allocation_v1
+  - gray_dual_momentum_aa_v1
+  - alvarez_spy_tlt_rotation_v1
+prerequisites: None

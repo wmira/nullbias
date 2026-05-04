@@ -1,0 +1,139 @@
+# =============================================================================
+# Connors TPS — Time, Price, Scale-In (10/20/30/40 pyramiding mean reversion)
+# =============================================================================
+
+strategy_id: connors_tps_v1
+name: "TPS (Time, Price, Scale-In)"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "TPS chapter (final strategy in book); with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "TPS chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: pyramid_scale_in
+asset_class: [etfs]
+specific_instruments: "Liquid US equity ETFs (SPY, QQQ, IWM, sector ETFs)"
+timeframe: daily
+holding_period_typical: "1–10 trading days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index and sector ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    LONG initial entry (10% tranche):
+      1. close(t) > SMA(close, 200) at bar t
+      2. RSI(close, 2) at bar t-1 < 25 AND RSI(close, 2) at bar t < 25  # two consecutive days oversold
+      3. No long position currently open in this instrument
+      → Buy 10% of intended full position at close(t).
+
+    LONG add-on tranches (20%, 30%, 40%) on subsequent bars t+k:
+      Add only if BOTH:
+        a. close(t+k) < entry_close_of_previous_tranche
+        b. position has not yet been exited (RSI(close, 2) at t+k <= 70)
+      Tranches are added in order: +20%, +30%, +40% (totalling 100%).
+      No more than one tranche per day; never add more than 4 tranches total.
+
+    SHORT side is symmetric: enter when close < SMA(200) and RSI(2) > 75
+    on two consecutive days; add tranches when next close > prior tranche
+    close.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of each tranche-trigger bar"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: pyramid_fixed_tranches
+  parameters:
+    risk_per_trade_pct: "Total trade risks the planned full position size; tranches are 10% / 20% / 30% / 40% of that target"
+    max_position_pct: 100   # of intended full position
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "10% → 20% → 30% → 40% sequential adds, only on consecutive lower closes (long)"
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit ENTIRE position when RSI(close, 2) at bar t > 70 (long) or < 30 (short)"
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single composite exit; closes all tranches at once"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter on each side"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + RSI warmup"
+  benchmark: "Buy-and-hold same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail) — note 4 separate fills per trade"
+  slippage_assumption: "5 bps × up to 4 tranches"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1993–2008 (book era)"
+  test_universe: "Liquid ETFs"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports ~94% win rate"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "High win rate offset by larger losers; the book frames TPS as the most powerful ETF strategy."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "5 tranches at 5/10/20/30/35 instead of 10/20/30/40"
+  - "Equal 25/25/25/25 tranches"
+  - "Hybrid: scale-in only on close-below-prior-close, not just oversold confirmation"
+  - "Apply to single stocks above $5"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author specifies 'two consecutive days RSI(2)<25' for first entry.
+    Some derivative literature loosens to 'RSI(2)<25 today' only — encode
+    the strict two-day form by default.
+  - Tranche-add trigger is "next-day lower close than previous tranche fill".
+    Implementation must track the close at which each tranche was filled
+    and compare incoming close to that specific level (not the entry close
+    of the original tranche).
+  - There is no explicit time stop — position can hold indefinitely until
+    RSI(2) > 70 fires.
+look_ahead_bias_warnings: "Each tranche fills at close-of-day; same caveat as RSI(2)."
+survivorship_bias_warnings: "Negligible (ETFs)."
+data_snooping_warnings: "10/20/30/40 tranche schedule is heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_rsi25_75_v1
+  - connors_cumulative_rsi_v1
+prerequisites: None

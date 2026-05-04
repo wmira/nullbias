@@ -1,0 +1,146 @@
+strategy_id: alvarez_monthly_sp500_rotation_ranking_v1
+name: "Different Ranking Methods for Monthly S&P500 Stock Rotation"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "Different ranking methods for a monthly S&P500 Stock Rotation Strategy"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/different-ranking-methods-for-a-monthly-sp500-stock-rotation-strategy/"
+  publication_year: 2018
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: monthly_stock_rotation_with_alternative_rankers
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks"
+timeframe: monthly
+holding_period_typical: "1 month"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks in S&P 500 (point-in-time) with:
+  - close > $5
+  - 21-day avg dollar volume > $10M
+  - close > SMA(close, 100)
+liquidity_filter: "21-day avg(close*volume) > $10M"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+    1. SPY close > SMA(SPY.close, 200)               (regime gate)
+    2. Build the eligible set: S&P 500 stocks with close > SMA(close, 100)
+    3. Rank stocks by ONE of the following methods (author tests several):
+       a. 6-month total return (descending)         — classic momentum
+       b. 12-month total return (descending)
+       c. 6m AND 12m return (rank-of-rank or sum)
+       d. 12-1 momentum (skip last month)
+       e. 100-day historical volatility (descending) — vol-following
+       f. 100-day historical volatility (ascending)  — low-vol
+       g. Combined factor score (e.g., momentum + low-vol)
+    4. Buy the top 10 stocks at next session's open (first trading day
+       of new month).
+
+    DEFAULT encoding: rank by 12-1 momentum descending; top 10 names.
+  indicators_used:
+    - name: SMA (SPY)
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: SMA
+      lookback_period: 100
+      formula_reference: simple
+      applied_to: close
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t-21] / close[t-252]) - 1   (12-1 momentum: skip last month)"
+      applied_to: close
+    - name: realized_volatility
+      lookback_period: 100
+      formula_reference: "stdev of daily returns over 100 days × sqrt(252)"
+      applied_to: returns
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-rank rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-month re-evaluation"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "SPY 200-SMA gate; if down, hold cash for full month"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "252 bars (12-1 momentum) + 200 bars SPY SMA"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5–10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2018"
+  test_universe: "S&P 500"
+  cagr: "Author's tables show several rankers beat SPY; 12-1 typically the strongest"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Comparison table in source post is the heart of the article; multiple rankers are documented."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top 5 / 20 names instead of 10"
+  - "6m simple momentum (no skip)"
+  - "Low-vol ranker"
+  - "Combined: 12-1 momentum + 100-day vol rank-of-ranks"
+  - "Add safety asset (TLT or SHY) when SPY < 200-SMA"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 12-1 momentum is the academic-standard skip-the-last-month construction:
+    return from t-252 to t-21.
+  - Author tests many rankers; 12-1 chosen as default because it's the
+    closest to academic momentum literature and consistently strong in
+    his tables.
+look_ahead_bias_warnings: "EOM signal, next-open fill — clean."
+survivorship_bias_warnings: "Material — point-in-time S&P 500 required."
+data_snooping_warnings: |
+  - The author specifically tests multiple rankers and documents which
+    work; this gives the user multiple shots at producing in-sample
+    fits. Out-of-sample test critical.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_weekly_sp500_meanrev_rotation_v1
+  - alvarez_three_factor_etf_rotation_v1
+  - alvarez_country_etf_rotation_v1
+prerequisites: None

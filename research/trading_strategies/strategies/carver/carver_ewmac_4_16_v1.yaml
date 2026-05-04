@@ -1,0 +1,135 @@
+strategy_id: carver_ewmac_4_16_v1
+name: "EWMAC(4,16) — Fast Trend"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Systematic Trading / Advanced Futures Trading Strategies"
+  chapter_or_url: "ST 2015 Appendix B; AFTS 2023 Strategy 7-9; pysystemtrade GitHub"
+  publication_year: 2015
+  page_or_section: "EWMAC trading rule"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: ewmac_trend_crossover
+asset_class: [futures]
+specific_instruments: "Diversified liquid futures (Carver's universe)"
+timeframe: daily
+holding_period_typical: "Days to weeks; turnover ~12× per year"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures contracts; cost-filter excludes expensive instruments though less aggressively than EWMAC(2,8)"
+liquidity_filter: "Cost-per-trade < (Sharpe × diversification benefit)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Continuous-forecast rule (same structure as carver_ewmac_2_8_v1
+    with these parameters):
+      L_fast = 4
+      L_slow = 16
+      forecast_scalar = 8.53
+      forecast_cap   = ±20
+      vol_lookback    = 25 days
+
+    1. fast_ema  = EWMA(price, span=4)
+    2. slow_ema  = EWMA(price, span=16)
+    3. raw_xover = fast_ema - slow_ema
+    4. price_vol = stdev of daily price differences over 25 days
+    5. forecast = (raw_xover / price_vol) × 8.53
+    6. capped_forecast = clip(forecast, -20, +20)
+  indicators_used:
+    - name: EWMA
+      lookback_period: 4
+      formula_reference: "Pandas: price.ewm(span=4).mean()"
+      applied_to: close
+    - name: EWMA
+      lookback_period: 16
+      formula_reference: "Pandas: price.ewm(span=16).mean()"
+      applied_to: close
+    - name: stdev
+      lookback_period: 25
+      formula_reference: "Standard deviation of daily price differences"
+      applied_to: "price differences"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of capped forecast (max ±2× avg at ±20)"
+    volatility_target: "User-defined annualised cash vol target"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 8.53
+    forecast_cap: 20.0
+  scaling_rules: "Continuous; size scales with forecast magnitude"
+  max_concurrent_positions: "All instruments in universe"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous; reverses when forecast crosses zero"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM applied at portfolio level"
+  sector_concentration_limits: "FDM applied within asset-class"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "25 bars vol + ~20 bars EWMA stabilisation"
+  benchmark: "Carver diversified system / BTOP50"
+  starting_capital: "Author uses $100k–$1M"
+  commission_assumption: "Per-contract; modelled in pysystemtrade cost framework"
+  slippage_assumption: "1 bid-ask spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years through 2023"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Higher than EWMAC(2,8); lower than EWMAC(16,64). Standalone ~0.4"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~12 round-trips per instrument per year"
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use return stdev instead of price stdev"
+  - "Drop forecast cap"
+  - "Apply asset-class subsets"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Same conventions as carver_ewmac_2_8_v1 except L_fast=4, L_slow=16,
+    forecast_scalar=8.53.
+  - Forecast scalar derived empirically to produce average |forecast| = 10.
+look_ahead_bias_warnings: "Same as carver_ewmac_2_8_v1."
+survivorship_bias_warnings: "Negligible (futures with proper roll handling)."
+data_snooping_warnings: "Calibrated parameters; OOS robustness is the empirical claim."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_2_8_v1
+  - carver_ewmac_8_32_v1
+  - carver_ewmac_16_64_v1
+  - carver_ewmac_32_128_v1
+  - carver_ewmac_64_256_v1
+  - carver_carry_v1
+prerequisites: "Volatility-target overlay (carver_vol_target_overlay_v1)"

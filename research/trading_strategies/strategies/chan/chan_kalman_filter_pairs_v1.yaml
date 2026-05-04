@@ -1,0 +1,136 @@
+strategy_id: chan_kalman_filter_pairs_v1
+name: "Pairs Trading with Kalman-Filter Dynamic Hedge Ratio"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Kalman filter chapter; epchan.blogspot.com posts"
+  publication_year: 2013
+  page_or_section: "Kalman filter for pairs trading"
+
+# === STRATEGY METADATA ===
+category: pairs
+sub_category: cointegration_pairs_kalman
+asset_class: [equities, etfs]
+specific_instruments: "Cointegrated pairs (e.g., EWA/EWC, GLD/GDX)"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Cointegrated pairs identified via Engle-Granger or Johansen"
+liquidity_filter: "Both legs liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Use Kalman filter to estimate time-varying hedge ratio β_t and
+    intercept α_t. State-space model:
+
+      Observation:  Y_t = α_t + β_t × X_t + ε_t       ε_t ~ N(0, R)
+      State:        [α_t, β_t]ᵀ = [α_{t-1}, β_{t-1}]ᵀ + ω_t   ω_t ~ N(0, Q)
+
+    Q is a small covariance matrix controlling state-evolution speed;
+    R is the observation noise variance. Chan's typical setting:
+      Q = δ / (1-δ) × I, where δ = 1e-4 to 1e-5
+      R = initial observation variance
+
+    At each bar:
+    1. Update Kalman state (α_t, β_t) given observation (X_t, Y_t)
+    2. Innovation (forecast error) e_t = Y_t - (α_t + β_t × X_t)
+    3. Forecast variance Q_t (state covariance + observation noise)
+    4. Z-score-equivalent: e_t / sqrt(Q_t)
+
+    Trade rules:
+      Long spread (long Y, short β_t × X) when e_t / sqrt(Q_t) < -1
+      Short spread when e_t / sqrt(Q_t) > +1
+      Close when |e_t / sqrt(Q_t)| < 0.5
+  indicators_used:
+    - name: Kalman_filter_state
+      lookback_period: "Recursive (initialised from first ~20 bars)"
+      formula_reference: |
+        Standard linear Gaussian Kalman filter recursion:
+          predict step: x_pred = x_prev; P_pred = P_prev + Q
+          update step:  K = P_pred × H'/(H × P_pred × H' + R)
+                        x_t = x_pred + K × (Y_t - H × x_pred)
+                        P_t = (I - K × H) × P_pred
+        with H = [1, X_t], state vector x = [α, β]
+      applied_to: "(X_t, Y_t) observations"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: dollar_neutral_dynamic_hedge
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Long Y of $X; short β_t × X of $X (rebalanced as β_t evolves)"
+  max_concurrent_positions: "Multiple pairs"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when innovation e_t / sqrt(Q_t) crosses zero or |e_t/sqrt(Q_t)| < 0.5"
+  stop_loss: "Optional: |e_t/sqrt(Q_t)| > 3"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: "Reverse when innovation z-score crosses zero"
+  exit_priority: "Z-reversion or stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "20-30 bars to seed Kalman state"
+  benchmark: "Cash / market-neutral"
+  starting_capital: 100000
+  commission_assumption: "Per-share × 2 legs; rebalance costs as β_t changes"
+  slippage_assumption: "5-10 bps per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-year in book examples"
+  test_universe: "EWA/EWC and others"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author reports Kalman version more stable than rolling regression"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "The Kalman filter's dynamic β handles slow drift in the cointegration relationship better than fixed-window OLS. Hedge ratio evolves smoothly."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different Q matrix (faster vs slower state evolution)"
+  - "Kalman EM to estimate Q and R from data"
+  - "Multi-asset extension (Kalman with vector state)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Q parameter δ controls how fast β can change; δ=1e-5 is slow,
+    δ=1e-3 is fast. Chan's published examples use ~1e-5.
+  - Initial state and covariance must be specified — typically use
+    OLS estimate from first 20 bars.
+  - Innovation z-score replaces traditional rolling z-score.
+look_ahead_bias_warnings: "Kalman filter is causal — only past data used. No look-ahead by construction."
+survivorship_bias_warnings: "Material on stock pairs."
+data_snooping_warnings: "Q parameter is tunable; sensitivity is real."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_pairs_engle_granger_v1
+  - chan_etf_pairs_ewa_ewc_v1
+prerequisites: None

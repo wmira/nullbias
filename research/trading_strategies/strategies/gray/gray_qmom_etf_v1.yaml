@@ -1,0 +1,130 @@
+strategy_id: gray_qmom_etf_v1
+name: "QMOM ETF — Live Implementation of Quantitative Momentum"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: paper
+  title: "QMOM ETF — Quantitative Momentum Index methodology"
+  chapter_or_url: "https://funds.alphaarchitect.com/qmom/ ; investment case PDFs on alphaarchitect.com"
+  publication_year: 2015
+  page_or_section: "ETF prospectus + factsheet"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: equity_smooth_momentum_etf_methodology
+asset_class: [equities]
+specific_instruments: "US mid- and large-cap stocks meeting QMOM index criteria"
+timeframe: quarterly
+holding_period_typical: "~3 months between rebalances"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Eligible universe per QMOM index methodology:
+  - Listed on major US exchange
+  - Market cap above defined threshold (mid-cap+)
+  - Adequate trading liquidity
+  - Excluding REITs, financials, and utilities
+liquidity_filter: "Investable size for ETF — ~$2B+ market cap typical"
+fundamental_filter: "Sector exclusions per index methodology"
+exclusions: "REITs, financials, utilities"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Quarterly rebalance — same FIP-screened 12-2 momentum process as
+    gray_quant_momentum_v1, with ETF-specific implementation details:
+
+    1. Compute 12-2 month return for all eligible stocks
+    2. Take the top decile (~10% of universe)
+    3. Apply FIP quality screen — sort by FIP_score ascending
+       (smoothest first)
+    4. Select TOP 50 stocks by FIP-improved momentum
+    5. Equal-weight allocation
+
+    Quarterly rebalance: index reconstitutes on 4 set dates per year
+    (typically Feb/May/Aug/Nov per ETF prospectus).
+  indicators_used:
+    - name: ROC_12_2
+      lookback_period: "21 to 252 trading days"
+      formula_reference: "(close[t-21] / close[t-252]) - 1"
+      applied_to: close
+    - name: FIP_score
+      lookback_period: 252
+      formula_reference: "Same as gray_quant_momentum_v1 FIP formula"
+      applied_to: returns
+  entry_price: market_open_next_bar
+  entry_time: "Set rebalance date open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2  # 1/50
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 50
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Quarterly rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Sector caps per ETF prospectus"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per stock"
+  benchmark: "S&P 500 / Russell 1000 / MSCI USA Momentum Index"
+  starting_capital: 100000
+  commission_assumption: "$0 retail (or hold the QMOM ETF directly at ~0.39% expense ratio)"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Live since Dec 2015"
+  test_universe: "QMOM eligible US universe"
+  cagr: "Tracks underlying index methodology; live results visible at funds.alphaarchitect.com"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~50% turnover per quarter typical"
+  notes: "Live ETF; subject to liquidity and sector-cap constraints not in book version."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "IMOM — international version (see gray_intl_quant_momentum_v1)"
+  - "Book / pre-ETF version with looser sector caps (see gray_quant_momentum_v1)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - This YAML codifies the live ETF methodology vs. the book's clean
+    research version (gray_quant_momentum_v1). Key differences are
+    investability constraints (liquidity, sector caps, REIT exclusion).
+  - Top 50 cap is the live methodology. Book also discusses 100-stock
+    variants.
+look_ahead_bias_warnings: "Same as gray_quant_momentum_v1."
+survivorship_bias_warnings: "Eliminated by ETF — uses point-in-time eligible universe."
+data_snooping_warnings: "Live since 2015 provides true OOS evidence; OOS results have varied."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_quant_momentum_v1
+  - gray_intl_quant_momentum_v1
+  - clenow_stocks_on_the_move_v1
+prerequisites: None

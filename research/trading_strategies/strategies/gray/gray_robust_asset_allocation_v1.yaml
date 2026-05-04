@@ -1,0 +1,152 @@
+strategy_id: gray_robust_asset_allocation_v1
+name: "Robust Asset Allocation (RAA) — TMOM + MA Composite Risk Trigger"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: paper
+  title: "Alpha Architect Robust Asset Allocation methodology"
+  chapter_or_url: "https://alphaarchitect.com/wp-content/uploads/2018/01/RAA_education_vF.pdf ; the Robust Asset Allocation Index page"
+  publication_year: 2015
+  page_or_section: "RAA education paper"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: composite_dual_signal_tactical_allocation
+asset_class: [etfs]
+specific_instruments: "Multi-asset basket — equities, intl equities, REITs, commodities, bonds"
+timeframe: monthly
+holding_period_typical: "Months"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Multi-asset universe (Alpha Architect canonical 5-asset RAA basket):
+  - US large equities (e.g., SPY)
+  - International equities (e.g., EFA)
+  - REITs (e.g., VNQ)
+  - Commodities (e.g., DBC)
+  - Long-term Treasuries (e.g., TLT)
+  Safe asset for risk-off: SHY or T-Bills.
+liquidity_filter: "ETF AUM > $500M"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month, for EACH asset:
+
+    Rule A — TMOM:
+      excess_return = total_return_12m - t_bill_return_12m
+      tmom_signal_A = 1 if excess_return > 0 else 0
+
+    Rule B — 12-month MA:
+      ma_signal_B = 1 if close(t) > SMA(close, 252)[t] else 0
+
+    Composite allocation per asset:
+      base_weight = 1 / N      (N = 5 in canonical RAA, equal-weight)
+      effective_weight = base_weight × (0.5 × tmom_signal + 0.5 × ma_signal)
+      i.e., if BOTH rules say 'on' → full allocation
+            if ONE rule says 'on'  → 50% allocation (other 50% to safe)
+            if NEITHER rule on     → 0% (full safe-asset for that slot)
+
+    Sum of asset allocations + safe-asset residual = 100% portfolio.
+  indicators_used:
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1   (12-month return)"
+      applied_to: close
+    - name: t_bill_return
+      lookback_period: 252
+      formula_reference: "Cumulative T-Bill / SHY return over same window"
+      applied_to: "T-Bill series"
+    - name: SMA
+      lookback_period: 252
+      formula_reference: "Simple 12-month moving average"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_base_weight_with_signal_scaling
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 20  # 1/5 base for each of 5 assets
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: |
+    Each asset weight scales with composite signal:
+    - 100% × base_weight if both rules ON
+    - 50% × base_weight if one rule ON
+    - 0% if both OFF (slot goes to safe asset)
+  max_concurrent_positions: 5
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation"
+  trailing_stop: None
+  signal_reversal: "Per-asset re-evaluation each month"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-asset built into rule"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Implicit through asset-class diversification"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per asset"
+  benchmark: "60/40 SPY/IEF or 1/N equal-weight buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in alphaarchitect.com publications"
+  test_universe: "5-asset basket"
+  cagr: "Comparable to 60/40; meaningfully lower drawdown"
+  sharpe: "Higher than 60/40 over long horizons"
+  max_dd: "Significantly reduced — typically half of buy-and-hold"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — couple of regime flips per asset per year"
+  notes: |
+    The TMOM and MA rules are highly correlated but differ in some periods —
+    using BOTH and only acting when they agree provides additional
+    robustness against any single rule's idiosyncratic failures.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use only TMOM (50/50 weighting becomes 100/0)"
+  - "Use only MA"
+  - "3-asset basket (US equity + intl equity + bonds)"
+  - "Risk-parity base weights instead of equal weight"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Composite signal formula: (0.5 × tmom + 0.5 × ma). Some
+    implementations require BOTH = 1 to allocate (binary AND);
+    Alpha Architect's canonical version is the 50/50 weighted version
+    encoded above.
+  - Safe asset substitution: residual cash from non-allocated slots
+    flows to T-Bills/SHY, not held as 0% return.
+look_ahead_bias_warnings: "EOM signal, next-open fill — clean."
+survivorship_bias_warnings: "Negligible (asset-class ETFs)."
+data_snooping_warnings: "Both rules conventional; their combination is the contribution. Tested out-of-sample since paper publication."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_tmom_v1
+  - gray_ma12_trend_v1
+  - gray_dual_momentum_aa_v1
+  - alvarez_three_factor_etf_rotation_v1
+prerequisites: None

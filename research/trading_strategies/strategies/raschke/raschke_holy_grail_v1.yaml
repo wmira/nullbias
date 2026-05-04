@@ -1,0 +1,137 @@
+strategy_id: raschke_holy_grail_v1
+name: "Holy Grail — ADX(14) > 30 + 20-EMA First Pullback"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts: High Probability Short-Term Trading Strategies"
+  chapter_or_url: "Chapter on Holy Grail; co-authored with Larry Connors"
+  publication_year: 1995
+  page_or_section: "Holy Grail chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: pullback_to_moving_average_in_strong_trend
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid trending instruments — equity index futures, individual stocks, ETFs"
+timeframe: daily
+holding_period_typical: "Days to a few weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Any liquid instrument exhibiting a strong trend per ADX"
+liquidity_filter: "Adequate volume for chosen position size"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation. LONG entry:
+
+    1. ADX(14) at bar t > 30                          (strong trend in place)
+    2. Price has pulled back to or below EMA(close, 20)
+       (i.e., low(t) ≤ EMA20(t) for the FIRST time after the trend
+        registered ADX > 30)
+    3. Wait for the SIGNAL BAR — the first bar that touches the 20-EMA
+       (low(t) ≤ EMA20 ≤ high(t))
+    4. Place a buy stop at high(signal_bar) + 1 tick (or 1 cent)
+    5. Order is good for one bar; if not filled by the next bar's close,
+       cancel.
+    6. Re-arm the setup only after a new pullback occurs in the same trend
+       (Raschke: "the first pullback is the most reliable; second and
+       third pullbacks have diminishing edge")
+
+    SHORT entry — symmetric:
+    1. ADX(14) at bar t > 30 with negative DI > positive DI (downtrend)
+    2. Price retraces UP to or above EMA20
+    3. Place sell stop at low(signal_bar) - 1 tick
+  indicators_used:
+    - name: ADX
+      lookback_period: 14
+      formula_reference: "Wilder's ADX. statsmodels / talib / Pandas-TA all implement standard form. Direction inferred via +DI vs -DI."
+      applied_to: high_low_close
+    - name: EMA
+      lookback_period: 20
+      formula_reference: "Exponential MA, span=20 (alpha = 2/(20+1) = 0.0952)"
+      applied_to: close
+  entry_price: stop_above_signal_bar_high
+  entry_time: "Next bar after signal — fills only if price exceeds signal bar's high"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity_or_atr
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position = (equity × 1%) / (entry - stop)"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Recent swing high / swing low; or trailing 20-EMA exit"
+  stop_loss: "Below newly-formed swing low (typically the low of the pullback bar or the day before signal)"
+  time_stop: "Optional: 5 bars if no follow-through"
+  trailing_stop: "Trail stop below EMA(20) on each new bar after entry"
+  signal_reversal: "ADX falls below 30 → take profits / tighten stop"
+  exit_priority: "Stop loss first, then trailing stop, then profit target at swing high"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "ADX > 30 IS the regime filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "20 bars EMA + ~28 bars (ADX with 14-bar smoothing requires ~2× period to stabilise)"
+  benchmark: "Buy-and-hold the underlying"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract for futures"
+  slippage_assumption: "5-10 bps for stocks; 1 spread for futures"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995 in book era"
+  test_universe: "Stocks, futures"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author claims ~70% win rate on first pullbacks per book examples"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Raschke describes Holy Grail as a discretionary-systematic hybrid — best results when combined with chart pattern recognition rather than purely mechanical."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use 20-period SMA instead of EMA"
+  - "Use ADX > 25 (less strict trend filter)"
+  - "Add momentum confirmation (e.g., 3-10 oscillator hook)"
+  - "Apply on 4H or weekly timeframe"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'First pullback' is intuitively clear but mechanically tricky:
+    define as 'first bar where low ≤ EMA20 after ADX has been > 30
+    for at least 5 consecutive bars'.
+  - ADX 'rising' vs 'absolute level' nuance: Raschke prefers ADX > 30
+    AND rising in the original book; some sources interpret as just
+    > 30. This YAML uses the level test only.
+  - Whether to enter on stop-above-signal-bar-high vs market-on-next-open
+    is a style choice; Raschke's stop entry is more selective.
+look_ahead_bias_warnings: "Stop-above-signal-bar-high is a true forward-looking entry — only fills if price exceeds the level."
+survivorship_bias_warnings: "Material on stocks if applied to current index list."
+data_snooping_warnings: "ADX threshold and EMA period are conventional; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_anti_v1
+  - raschke_3_10_oscillator_v1
+  - clenow_core_trend_v1
+prerequisites: None

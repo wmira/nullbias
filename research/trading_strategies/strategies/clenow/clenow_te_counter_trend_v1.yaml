@@ -1,0 +1,127 @@
+strategy_id: clenow_te_counter_trend_v1
+name: "Trading Evolved — Counter-Trend Mean Reversion (Bollinger)"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved"
+  chapter_or_url: "Counter-trend (mean reversion) strategy chapter; companion Zipline code"
+  publication_year: 2019
+  page_or_section: "Counter-trend chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: bollinger_extreme_with_trend_filter
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks (point-in-time)"
+timeframe: daily
+holding_period_typical: "5-15 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "S&P 500 stocks with point-in-time membership"
+liquidity_filter: "Implicit via S&P 500 membership"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation at the close:
+
+    1. close(t) > SMA(close, 200)                  (long-term uptrend filter)
+    2. close(t) < lower_bollinger(close, 50, 1.5)  (extended below the lower
+                                                    Bollinger Band, period=50,
+                                                    1.5 stdev)
+    3. No position currently open in this stock
+
+    Buy at next-day open.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: Bollinger_Bands
+      lookback_period: 50
+      formula_reference: |
+        mid = SMA(close, 50)
+        upper = mid + 1.5 * stdev(close, 50)
+        lower = mid - 1.5 * stdev(close, 50)
+        stdev uses ddof=0 (TA-Lib convention) by default
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "Next-day open after signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10  # ~10 concurrent positions
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when close > SMA(close, 50) (close above the Bollinger mid line)"
+  stop_loss: None
+  time_stop: "Exit after 10 bars if profit target not hit"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Profit target first; time stop second"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-stock 200-SMA filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 50 bars (Bollinger)"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "S&P 500"
+  cagr: "Author shows mean-reversion as a counter-trend complement; standalone returns lower than trend"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Used in the book to demonstrate counter-trend logic and as a diversifier to Stocks on the Move."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "20-period × 2 stdev Bollinger (standard parameters)"
+  - "Add RSI(2) < 5 confirmation filter"
+  - "Apply to ETFs instead of S&P 500 stocks"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author's exact Bollinger parameters in the book example use a longer
+    period (50) and tighter stdev (1.5) than typical; this is intentional
+    to produce more frequent counter-trend signals.
+  - Stdev convention: ddof=0 (population) used here; ddof=1 acceptable.
+  - Time stop of 10 bars is the book's example; not heavily tuned.
+look_ahead_bias_warnings: "Same-day close signal; next-day open fill."
+survivorship_bias_warnings: "Material on stocks; use point-in-time S&P 500."
+data_snooping_warnings: "Bollinger parameters are heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_pct_b_v1
+  - connors_rsi2_v1
+  - alvarez_simple_meanrev_v1
+prerequisites: None

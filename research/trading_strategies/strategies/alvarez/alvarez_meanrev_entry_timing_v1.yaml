@@ -1,0 +1,137 @@
+strategy_id: alvarez_meanrev_entry_timing_v1
+name: "Mean Reversion Entry Timing — Limit-Order at N% Below Close"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "Mean Reversion Entry: At Open vs. Intraday Pullback vs Confirmation / Mean Reversion Entry Timing"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/mean-reversion-entry-at-open-vs-intraday-pullback-vs-confirmation/ and /mean-reversion-entry-timing/"
+  publication_year: 2017
+  page_or_section: "Two posts; this YAML codifies the limit-order intraday-pullback variant"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: limit_order_entry_timing
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks"
+timeframe: daily
+holding_period_typical: "3–7 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - S&P 500 membership (point-in-time)
+  - close > $5
+  - 21-day avg dollar volume > $10M
+liquidity_filter: "21-day avg(close*volume) > $10M"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Setup at close of bar t (any standard mean-reversion setup, e.g.
+    Alvarez's RSI(2) base):
+    1. close(t) > SMA(close, 200)
+    2. RSI(close, 2)[t] < 5
+    3. No position already open
+
+    Entry-timing variants compared in the source posts:
+      A. Buy at next-day open (market order)
+      B. Place limit at close(t) * (1 - X%) for day t+1; cancel if not filled
+         (default X = 4%; author tests 3, 4, 5, 7, 10%)
+      C. Wait for confirmation: only enter if next bar's close < bar(t) close
+
+    DEFAULT ENCODING: variant B with X = 4%.
+    Hard-fail to next-day open if author's specific spec uses A.
+    The strategy YAML name reflects the "limit-order at N% below close" variant.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: "Limit at 0.96 * close(t) on day t+1"
+  entry_time: "Intraday on day t+1 if low(t+1) <= limit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit at next open after RSI(close, 2) > 65"
+  stop_loss: None
+  time_stop: "8 bars (next open after 8 bars in trade)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Profit target first; time stop second"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-stock 200-SMA"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars + RSI warmup"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "0 bps for limit fills (price guaranteed); add modeling for missed-fill bias"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2017"
+  test_universe: "S&P 500"
+  cagr: "Limit-order at 4% below close materially outperforms next-day-open in author's tables"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Higher than market entry"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Lower (since not all limits fill)"
+  notes: |
+    Author's framing: limit-order entry IS the alpha — much of the apparent
+    edge in mean-reversion backtests evaporates when you assume next-day
+    open fills.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "X = 3% (more aggressive — more fills, smaller bonus)"
+  - "X = 5%, 7%, 10% (more selective)"
+  - "Use ATR-multiple instead of fixed % (e.g., 1 × ATR(10) below close)"
+  - "Confirmation variant: enter next day only if close(t+1) < close(t)"
+  - "Hybrid: try limit first; if not filled by close(t+1), enter at close(t+1)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Default X = 4%; this is a robust mid-point in author's parameter sweeps.
+  - Limit must be cancelled at end of t+1 if not filled — do NOT carry GTC.
+  - Survivorship-style note: limit-order fills only on intraday weakness,
+    so the strategy's hit rate is conditional on further down-move next day.
+look_ahead_bias_warnings: "Clean — limit price set with close(t), executed on day t+1 intraday."
+survivorship_bias_warnings: "Material on stock universes — point-in-time required."
+data_snooping_warnings: "Limit distance is the key tunable; author tests multiple values."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_rsi2_rule_change_v1
+  - alvarez_simple_meanrev_v1
+  - alvarez_abc_meanrev_v1
+prerequisites: None

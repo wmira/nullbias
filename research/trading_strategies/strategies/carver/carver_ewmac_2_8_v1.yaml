@@ -1,0 +1,167 @@
+strategy_id: carver_ewmac_2_8_v1
+name: "EWMAC(2,8) — Fastest Trend"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Systematic Trading / Advanced Futures Trading Strategies"
+  chapter_or_url: "Systematic Trading (2015) Appendix B; AFTS (2023) Strategy 7; qoppac.blogspot.com — multiple posts; pysystemtrade GitHub `private.systems.provided.futures_chapter15.rules`"
+  publication_year: 2015
+  page_or_section: "EWMAC trading rule appendix"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: ewmac_trend_crossover
+asset_class: [futures]
+specific_instruments: "Carver's full diversified futures universe (~30–50 contracts across asset classes); also applies to ETFs and stocks if liquidity-adjusted"
+timeframe: daily
+holding_period_typical: "Days; turnover ~25× per year for this speed"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Diversified liquid futures contracts across asset classes. Carver's
+  framework selects instruments by:
+  - daily volume (sufficient for retail size)
+  - cost-per-trade (excluding instruments where this rule's Sharpe contribution
+    is below cost threshold; for EWMAC(2,8), only the cheapest ~50% of
+    instruments are economic)
+  Asset classes: equities, bonds, FX, metals, energy, agriculturals, vol.
+liquidity_filter: "Cost-per-trade < (Sharpe × forecast diversification benefit). EWMAC(2,8) is high-turnover so excludes expensive instruments."
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Instruments where round-trip cost > 0.10× annualised vol per trade"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Continuous-forecast rule. Compute on each daily close:
+
+    1. fast_ema  = EWMA(price, span=2)
+    2. slow_ema  = EWMA(price, span=8)
+    3. raw_xover = fast_ema - slow_ema
+    4. price_vol = stdev of daily price changes over 25 days
+                   (Carver uses standard deviation of price differences,
+                    not returns, for futures)
+    5. norm_xover = raw_xover / price_vol           # vol-normalised crossover
+    6. forecast = norm_xover × forecast_scalar
+       forecast_scalar (EWMAC 2,8) = 12.1
+    7. capped_forecast = clip(forecast, -20, +20)
+
+    Position direction:
+      Long if capped_forecast > 0
+      Short if capped_forecast < 0
+      Flat if capped_forecast = 0
+
+    Position SIZE:
+      target_position = (capped_forecast / 10)
+                      × instrument_block_value
+                      × volatility_target
+                      × cash_target
+                      / (instrument_value × instrument_vol_pct × FX)
+
+    See `carver_vol_target_overlay_v1` for full position-sizing math.
+  indicators_used:
+    - name: EWMA
+      lookback_period: 2
+      formula_reference: "Exponentially weighted moving average. Pandas: price.ewm(span=2).mean(); alpha = 2/(span+1)"
+      applied_to: close
+    - name: EWMA
+      lookback_period: 8
+      formula_reference: "EWMA span=8"
+      applied_to: close
+    - name: stdev
+      lookback_period: 25
+      formula_reference: "Standard deviation of daily price differences (close[t] - close[t-1])"
+      applied_to: "price differences"
+  entry_price: close_signal_bar
+  entry_time: "Continuous adjustment to target position; rebalance daily or when |actual - target| > tolerance"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of capped forecast (max ±2× average position at forecast = ±20)"
+    volatility_target: "User-defined annualised cash volatility target (e.g., 25% annualised)"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 12.1
+    forecast_cap: 20.0
+  scaling_rules: "Continuous: target position scales with forecast magnitude"
+  max_concurrent_positions: "All instruments in universe simultaneously, each sized by its own forecast"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Position size adjusts continuously with forecast; flat when forecast = 0; reverses when forecast crosses zero"
+  exit_priority: "Continuous re-sizing replaces discrete exits"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Inter-instrument forecast correlation drives instrument-diversification multiplier (IDM)"
+  sector_concentration_limits: "Asset-class forecast correlation drives forecast-diversification multiplier (FDM)"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "25 bars for vol estimate; rule itself is responsive within ~10 bars"
+  benchmark: "Carver's diversified system (40+ instruments, 8 rules); or BTOP50 CTA index"
+  starting_capital: "Author demonstrates with $100k–$1M futures account"
+  commission_assumption: "Per-contract fees + slippage; modeled via cost-per-block in Carver's framework"
+  slippage_assumption: "1 bid-ask spread per round-trip"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1970s–present in AFTS (2023); ~50 years"
+  test_universe: "Carver's full diversified futures set"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone Sharpe ~0.3; lower than slower EWMACs but adds diversification"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Highest of EWMAC family — ~25 round-trips per instrument per year"
+  notes: |
+    Carver flags EWMAC(2,8) as economical only for the lowest-cost instruments.
+    Higher correlation with EWMAC(4,16) than with slower variants.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop forecast cap (uncapped variant; rare in Carver's published systems)"
+  - "Use return stdev instead of price stdev for normalisation"
+  - "Apply only to FX or rates (asset-class subset)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - EWMA span convention: pandas `ewm(span=N)` uses alpha = 2/(N+1).
+    Carver uses this convention.
+  - Volatility lookback: 25 days is the canonical pysystemtrade default;
+    some posts use 36 days.
+  - Forecast scalars are EMPIRICAL, derived by Carver from in-sample
+    backtests to produce average abs forecast = 10. The scalar 12.1 is
+    the value for EWMAC(2,8).
+  - Continuous sizing: implementations may quantise to integer contracts;
+    rounding rules and minimum-trade thresholds matter.
+look_ahead_bias_warnings: "EWMA at bar t uses close(t); fill at close(t) requires MOC. T+1 fill is safer."
+survivorship_bias_warnings: "Futures are largely survivorship-immune; expired contracts must be rolled, not dropped."
+data_snooping_warnings: |
+  - Forecast scalars and the choice of {2,8} pair are calibrated.
+    Cross-asset and cross-period robustness is the empirical claim.
+  - In-sample estimation period for the scalar matters; recompute
+    out-of-sample to confirm.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_4_16_v1
+  - carver_ewmac_8_32_v1
+  - carver_ewmac_16_64_v1
+  - carver_ewmac_32_128_v1
+  - carver_ewmac_64_256_v1
+  - carver_carry_v1
+  - carver_vol_target_overlay_v1
+prerequisites: "Carver framework requires the volatility-target overlay (see carver_vol_target_overlay_v1)"

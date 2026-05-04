@@ -1,0 +1,176 @@
+strategy_id: carver_vol_target_overlay_v1
+name: "Volatility-Targeted Position Sizing (Portfolio Overlay)"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Systematic Trading / Leveraged Trading / Advanced Futures Trading Strategies"
+  chapter_or_url: "ST 2015 Chapters 9-10; LT 2019 Chapters 6-7; AFTS 2023 throughout; pysystemtrade GitHub `system.positionSizing`"
+  publication_year: 2015
+  page_or_section: "Position-sizing chapters"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: portfolio_overlay_position_sizing
+asset_class: [futures, equities, etfs, fx, bonds]
+specific_instruments: "ANY instrument with a tradable continuous price series and known notional exposure per contract / share"
+timeframe: daily
+holding_period_typical: "N/A — overlay, not standalone strategy"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by the underlying strategies feeding into this overlay"
+liquidity_filter: "Per-strategy"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    This is an OVERLAY: it sits on top of a forecasting trading rule (e.g.,
+    EWMAC or carry) and converts a continuous forecast into a contract count.
+
+    Inputs (computed or chosen):
+      - capped_forecast: from the underlying rule, range ±20
+      - cash_volatility_target: e.g., 25% of equity annualised
+      - portfolio_value: current cash equity
+      - instrument_value_per_contract: contract price × multiplier × FX
+      - instrument_vol_pct_annualised: stdev of daily returns × sqrt(256)
+      - IDM (instrument diversification multiplier): function of inter-instrument
+        forecast correlation. For Carver's 30-instrument system ≈ 2.5.
+      - FDM (forecast diversification multiplier): function of forecast
+        correlation across rules. For 8 rules ≈ 1.4.
+      - instrument_weight: e.g., 1/N for N instruments (or risk-parity weighted)
+      - forecast_weight: weight of this rule in the combined forecast
+
+    Step 1 — Cash daily volatility target:
+        daily_vol_target = portfolio_value × cash_volatility_target / 16
+        (16 ≈ sqrt(256) for daily annualisation)
+
+    Step 2 — Risk capital per instrument:
+        per_inst_risk = daily_vol_target × instrument_weight × IDM
+
+    Step 3 — Volatility scalar (number of avg-position-size blocks):
+        vol_scalar = per_inst_risk
+                   / (instrument_value_per_contract × instrument_vol_pct / 16)
+
+    Step 4 — Subsystem position (avg position when combined forecast = 10):
+        subsystem_position = vol_scalar × FDM × forecast_weight × instrument_weight
+
+    Step 5 — Scale by current forecast:
+        target_contracts = subsystem_position × (combined_forecast / 10)
+
+    Step 6 — Round to integer contracts (with a buffer to avoid over-trading):
+        if |actual_contracts - target_contracts| > buffer ⇒ rebalance
+        else hold
+
+    Position direction:
+      Long if combined_forecast > 0; short if < 0.
+  indicators_used:
+    - name: realised_volatility
+      lookback_period: 25
+      formula_reference: "Stdev of daily returns × sqrt(256). Carver's pysystemtrade uses an adjusted estimator combining 25-day and 10-year averages."
+      applied_to: returns
+  entry_price: close_signal_bar
+  entry_time: "Continuous; rebalance when |actual - target| > buffer"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_overlay
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Capped by max-leverage constraint at portfolio level"
+    volatility_target: "Annualised cash vol target — typical 25% (Carver's preferred mid-range)"
+    atr_multiple: NOT_SPECIFIED
+    IDM: "≈ 2.5 for 30-instrument diversified set"
+    FDM: "≈ 1.4 for 8-rule combined forecast"
+    rebalance_buffer: "0.10 × subsystem_position (Carver's default)"
+  scaling_rules: "Continuous; integer-quantised to contracts"
+  max_concurrent_positions: "All instruments in universe"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Position size adjusts continuously with forecast"
+  exit_priority: "Continuous resizing replaces discrete exits"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Optional: scale down vol target after large drawdown"
+  market_regime_filter: None
+  correlation_limits: "IDM derived from rolling correlation matrix of instrument forecasts"
+  sector_concentration_limits: "FDM derived from rolling correlation matrix of rule forecasts"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "25 bars vol + as required by underlying rules"
+  benchmark: "60/40, BTOP50, Carver pysystemtrade"
+  starting_capital: "$100k+ for futures"
+  commission_assumption: "Per-contract; modeled in the cost-eligibility filter"
+  slippage_assumption: "1 bid-ask spread per trade"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Author runs LIVE since 2014; backtests cover ~50 years"
+  test_universe: "30+ futures, 8 rules combined"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author's framework targets Sharpe 1.0+ for the combined system"
+  max_dd: "Capped via vol target at ~25% / 16 = 1.5% daily — cumulative drawdown depends on autocorrelation"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    This is the cornerstone of the entire Carver framework. Without it,
+    every individual rule above produces uncalibrated forecasts that
+    cannot be combined.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different volatility-target levels (10%, 25%, 50%)"
+  - "Risk-parity instrument weights instead of equal weight"
+  - "Hand-crafted instrument weights (Carver's preferred method per blog)"
+  - "Drawdown-conditional vol scaling"
+  - "Cash equity-curve smoothing for the equity input"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Annualisation factor: Carver uses 16 (≈ sqrt(256)) where 256 is
+    trading days. Some implementations use 252 / sqrt(252) ≈ 15.87.
+  - IDM and FDM are EMPIRICAL. They need to be re-estimated whenever
+    instruments or rules change.
+  - The buffer rule is critical for cost control; without it, daily
+    rebalancing kills returns through churn.
+  - Vol estimator: Carver's framework uses an adjusted blend of
+    short-term (25 day) and long-term (10 year) volatility to reduce
+    sensitivity to recent shocks.
+look_ahead_bias_warnings: "Vol estimator uses CURRENT bar close — fine for end-of-day execution; live trading must reconcile."
+survivorship_bias_warnings: "Per-strategy."
+data_snooping_warnings: |
+  - IDM and FDM constants estimated in-sample. Re-estimating OOS is
+    essential for honest performance assessment.
+  - Vol target (25%) is the user's risk choice, not an optimised
+    parameter.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_2_8_v1
+  - carver_ewmac_4_16_v1
+  - carver_ewmac_8_32_v1
+  - carver_ewmac_16_64_v1
+  - carver_ewmac_32_128_v1
+  - carver_ewmac_64_256_v1
+  - carver_carry_v1
+  - carver_breakout_20_v1
+  - carver_breakout_80_v1
+  - carver_skew_v1
+  - carver_assettrend_v1
+  - carver_relmomentum_v1
+  - carver_acceleration_v1
+  - carver_fast_meanrev_v1
+prerequisites: "None — this IS the prerequisite for every other Carver strategy"

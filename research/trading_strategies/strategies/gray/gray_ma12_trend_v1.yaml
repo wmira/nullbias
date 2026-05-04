@@ -1,0 +1,119 @@
+strategy_id: gray_ma12_trend_v1
+name: "12-Month Moving Average Trend Rule"
+author: Wesley Gray (Alpha Architect; following Faber)
+
+source:
+  type: blog_post
+  title: "Avoiding the Big Drawdown / The World's Longest Trend-Following Backtest / Faber 'A Quantitative Approach to Tactical Asset Allocation'"
+  chapter_or_url: "alphaarchitect.com trend-following category; SSRN papers"
+  publication_year: 2015
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: long_term_moving_average_filter
+asset_class: [etfs]
+specific_instruments: "Single risky asset (e.g., SPY) with safe-asset substitution"
+timeframe: monthly
+holding_period_typical: "Months — until regime shift"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "One risky asset and one safe asset"
+liquidity_filter: "Implicit"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+
+    1. Compute SMA(close, 252)  (12-month simple moving average)
+    2. If close(t) > SMA(close, 252)[t]:
+         go long risky asset (100% allocation)
+       Else:
+         hold safe asset (T-Bills / SHY)
+
+    Re-evaluate monthly.
+  indicators_used:
+    - name: SMA
+      lookback_period: 252
+      formula_reference: "Simple moving average over 252 trading days (approximately 12 calendar months)"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_into_single_asset
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation"
+  trailing_stop: None
+  signal_reversal: "Switch to safe asset when close < 12mo SMA"
+  exit_priority: "Single rule"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into rule"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars"
+  benchmark: "Buy-and-hold of the risky asset"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-century in some Alpha Architect tests"
+  test_universe: "SPY, equity indexes, gold, multi-asset"
+  cagr: "Slightly below buy-and-hold; primary benefit is drawdown reduction"
+  sharpe: "Higher Sharpe than buy-and-hold over long periods"
+  max_dd: "Significantly reduced vs buy-and-hold"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few"
+  notes: "Faber's original 2007 paper extensively tested this rule. Highly correlated with TMOM (~0.9) but with different individual signals."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "10-month SMA instead of 12 (Faber's original)"
+  - "200-day SMA on daily data"
+  - "EMA instead of SMA"
+  - "Apply per-asset across multi-asset universe"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 252-day SMA approximates 12-month SMA on daily data. Faber's
+    original used 10-month SMA on monthly data; both produce similar
+    results.
+  - Switching costs and tax implications real-world.
+look_ahead_bias_warnings: "EOM close signal, next-open fill."
+survivorship_bias_warnings: "None."
+data_snooping_warnings: "Window length conventional."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_tmom_v1
+  - gray_robust_asset_allocation_v1
+  - alvarez_spy_tlt_rotation_v1
+prerequisites: None

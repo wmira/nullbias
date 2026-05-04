@@ -1,0 +1,136 @@
+strategy_id: longmore_crypto_carry_v1
+name: "Crypto Perpetual Funding Rate Carry"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "The Art and Science of Trading Carry; Crypto carry research"
+  chapter_or_url: "robotwealth.com/the-art-and-science-of-trading-carry/"
+  publication_year: 2022
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: crypto_perp_funding_carry
+asset_class: [crypto]
+specific_instruments: "Perpetual futures on Binance, Hyperliquid, Bybit, etc. (BTC, ETH, SOL, and major alts)"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid crypto perpetual futures across major venues"
+liquidity_filter: "Adequate volume; tight bid-ask"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Skip illiquid alts during high vol"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Crypto perpetual futures have funding rates that compensate for
+    the divergence of perp price from spot. Funding rate is paid
+    every 8 hours (Binance), 1 hour (Hyperliquid), etc.
+
+    Carry trade:
+    1. For each perp, observe funding rate F (annualised).
+    2. Across the cross-section of perps:
+       - LONG perps with NEGATIVE funding (you receive funding)
+       - SHORT perps with POSITIVE funding (you receive funding)
+    3. Hedge each leg with spot (delta-neutral) so you collect funding
+       without directional exposure:
+       - For LONG perp: short equivalent spot
+       - For SHORT perp: long equivalent spot
+
+    Alternative simplified version (no hedge):
+    - Long perps with most-negative funding
+    - Short perps with most-positive funding
+    - Accept some directional risk
+
+    Sinclair-style take: funding rate IS the futures basis; this is
+    a carry trade in the most literal sense.
+  indicators_used:
+    - name: funding_rate
+      lookback_period: 1
+      formula_reference: "Exchange-published funding rate per perp; annualise by multiplying by funding intervals per year"
+      applied_to: "perpetual futures"
+    - name: cross_sectional_rank_of_funding
+      lookback_period: 1
+      formula_reference: "Rank perps by current funding rate across universe"
+      applied_to: "funding rate cross-section"
+  entry_price: market_at_close
+  entry_time: "Daily evaluation; rebalance when ranks shift materially"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_dollar_per_pair
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Equal-dollar across long and short legs; spot hedges sized to perfect delta-neutral"
+  max_concurrent_positions: "Top quartile long, bottom quartile short"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "Optional: close on 10% adverse move (mainly relevant for unhedged version)"
+  time_stop: "Daily re-rank; rotate if funding signs flip"
+  trailing_stop: None
+  signal_reversal: "Funding sign reversal"
+  exit_priority: "Daily re-rank → stop"
+  exit_price: market_at_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Crypto-wide vol spike (e.g., >30% daily move): close all positions"
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: "Multiple alt longs are highly correlated; cap exposure per pair"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close, funding_rate]
+  data_frequency: "8-hour or hourly (funding settlement intervals)"
+  minimum_history_required: "1+ year of perp history"
+  benchmark: "Spot crypto buy-and-hold or 60/40 BTC/ETH"
+  starting_capital: 50000
+  commission_assumption: "Per-trade exchange fees (~5-10 bps); funding paid/received"
+  slippage_assumption: "10-20 bps for hedged crypto trades"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "2020-present (perps era)"
+  test_universe: "Major crypto perps"
+  cagr: "Author reports significant carry yields, though variable by exchange and regime"
+  sharpe: "High Sharpe in stable funding-rate environments"
+  max_dd: "Material in liquidations / exchange-failure events (FTX, etc.)"
+  win_rate: "Daily P&L positive most days"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Crypto carry returns have been meaningful since 2020. Key risks
+    are exchange counter-party (FTX), funding-rate spikes, and
+    liquidation cascades during vol events.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Single-pair carry (just BTC perp short with spot long)"
+  - "Cross-exchange arb (different funding rates for same pair)"
+  - "Term-structure-aware (extrapolate funding curve)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Funding interval differs by exchange (Binance 8hr, Hyperliquid 1hr).
+  - Annualisation: funding × intervals_per_year.
+  - Delta-hedge requires both perp account AND spot account; capital
+    inefficiency.
+look_ahead_bias_warnings: "Funding paid retrospectively; use funding rate KNOWN at evaluation time."
+survivorship_bias_warnings: "Material — many alt-coin perps have been delisted."
+data_snooping_warnings: "Cross-section size and rebalance frequency tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_carry_v1
+  - clenow_te_carry_v1
+prerequisites: "Crypto exchange access; perps + spot capability"

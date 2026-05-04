@@ -1,0 +1,116 @@
+strategy_id,author,name,category,sub_category,asset_class,timeframe,direction,source_type,source_title,publication_year,completeness_score,status
+connors_rsi2_v1,Larry Connors,RSI(2) Strategy,mean_reversion,oversold_pullback,equities;etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_r3_v1,Larry Connors,R3 Strategy,mean_reversion,oversold_pullback,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_double7_v1,Larry Connors,Double 7's Strategy,mean_reversion,rolling_low_break,etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_3day_high_low_v1,Larry Connors,3-Day High/Low Method,mean_reversion,lower_highs_lower_lows,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_mdd_v1,Larry Connors,Multiple Days Down (MDD),mean_reversion,count_of_down_days,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_mdu_v1,Larry Connors,Multiple Days Up (MDU),mean_reversion,count_of_up_days_short,etfs,daily,short_only,book,High Probability ETF Trading,2009,4,extracted
+connors_rsi25_75_v1,Larry Connors,RSI 25 / RSI 75 Strategy,mean_reversion,oversold_pullback,etfs,daily,long_short,book,High Probability ETF Trading,2009,5,extracted
+connors_pct_b_v1,Larry Connors,%b (Bollinger Bands) Strategy,mean_reversion,bollinger_extreme,etfs,daily,long_only,book,High Probability ETF Trading,2009,5,extracted
+connors_tps_v1,Larry Connors,TPS (Time Price Scale-In),mean_reversion,pyramid_scale_in,etfs,daily,long_short,book,High Probability ETF Trading,2009,4,extracted
+connors_cumulative_rsi_v1,Larry Connors,Cumulative RSI Strategy,mean_reversion,oversold_pullback,equities;etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+connors_crsi_pullback_v1,Larry Connors,ConnorsRSI Pullback Strategy,mean_reversion,composite_oversold,equities;etfs,daily,long_only,paper,An Introduction to ConnorsRSI / Pullbacks Guidebook,2012,4,extracted
+connors_vix_rsi_v1,Larry Connors,VIX RSI Strategy,mean_reversion,volatility_spike_buy,etfs,daily,long_only,book,Short Term Trading Strategies That Work,2008,5,extracted
+alvarez_weekly_sp500_meanrev_rotation_v1,Cesar Alvarez,Weekly Mean Reversion Rotation on S&P 500,mean_reversion,rotation_top_n_pulled_back,equities,weekly,long_only,blog_post,Weekly Mean Reversion Rotation Strategy on S&P500 Stocks,2018,4,extracted
+alvarez_rsi2_rule_change_v1,Cesar Alvarez,RSI(2) Rule Change That Doubled Returns,mean_reversion,oversold_pullback,equities,daily,long_only,blog_post,RSI2 Strategy: Double returns with a simple rule change,2017,4,extracted
+alvarez_country_etf_rotation_v1,Cesar Alvarez,Country ETF Rotation with Bond Fallback,momentum,dual_momentum_rotation_with_safe_asset,etfs,monthly,long_only,blog_post,Country ETF Rotation,2017,5,extracted
+alvarez_etf_sector_rotation_v1,Cesar Alvarez,ETF Sector Rotation (Middle-Rank),momentum,sector_rotation_anti_top_rank,etfs,monthly,long_only,blog_post,Sector Rotation Strategy: Should Trading Rules Make Sense?,2017,5,extracted
+alvarez_three_factor_etf_rotation_v1,Cesar Alvarez,Three Factor ETF Rotation,momentum,multi_factor_etf_rotation,etfs,monthly,long_only,blog_post,Three Factor ETF Rotation Strategy,2022,4,extracted
+alvarez_etf_bond_rotation_v1,Cesar Alvarez,ETF Bond Rotation,momentum,bond_etf_rotation,etfs;bonds,monthly,long_only,blog_post,ETF Bond Rotation,2017,4,extracted
+alvarez_spy_sso_tlt_v1,Cesar Alvarez,SPY/SSO/TLT Regime-Aware Strategy,momentum,regime_switch_with_leverage,etfs,monthly,long_only,blog_post,SPY SSO and TLT Strategy,2017,4,extracted
+alvarez_spy_tlt_rotation_v1,Cesar Alvarez,SPY/TLT Monthly Rotation,momentum,two_asset_relative_strength,etfs;bonds,monthly,long_only,blog_post,SPY TLT Rotation,2017,5,extracted
+alvarez_50_50_spy_v1,Cesar Alvarez,50/50 SPY Strategy,momentum,regime_aware_leverage,etfs,daily,long_only,blog_post,The 50/50 SPY Strategy,2018,4,extracted
+alvarez_abc_meanrev_v1,Cesar Alvarez,ABCs Mean Reversion (Canonical Template),mean_reversion,combined_indicators_with_ranking,equities,daily,long_only,blog_post,The ABCs of creating a mean reversion strategy,2018,4,extracted
+alvarez_simple_meanrev_v1,Cesar Alvarez,Simple Ideas for a Mean Reversion Strategy,mean_reversion,oversold_pullback_with_volatility_rank,equities,daily,long_only,blog_post,Simple Ideas for a Mean Reversion Strategy with Good Results,2017,5,extracted
+alvarez_connorsrsi_pullback_v1,Cesar Alvarez,ConnorsRSI Pullback (Limit Order),mean_reversion,composite_oversold_with_limit_entry,equities,daily,long_only,blog_post,ConnorsRSI Analysis,2018,4,extracted
+alvarez_volume_meanrev_v1,Cesar Alvarez,Volume + Mean Reversion Overlay,mean_reversion,oversold_with_volume_spike,equities,daily,long_only,blog_post,Volume and Mean Reversion,2017,5,extracted
+alvarez_meanrev_entry_timing_v1,Cesar Alvarez,Mean Reversion Entry Timing (Limit-Order),mean_reversion,limit_order_entry_timing,equities,daily,long_only,blog_post,Mean Reversion Entry: At Open vs. Intraday Pullback vs Confirmation,2017,5,extracted
+alvarez_monthly_sp500_rotation_ranking_v1,Cesar Alvarez,Monthly S&P500 Rotation with Alt Rankers,momentum,monthly_stock_rotation_with_alternative_rankers,equities,monthly,long_only,blog_post,Different ranking methods for a monthly S&P500 Stock Rotation Strategy,2018,4,extracted
+carver_ewmac_2_8_v1,Robert Carver,EWMAC(2_8) Fastest Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_ewmac_4_16_v1,Robert Carver,EWMAC(4_16) Fast Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_ewmac_8_32_v1,Robert Carver,EWMAC(8_32) Medium-Fast Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_ewmac_16_64_v1,Robert Carver,EWMAC(16_64) Medium Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,5,extracted
+carver_ewmac_32_128_v1,Robert Carver,EWMAC(32_128) Slow Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_ewmac_64_256_v1,Robert Carver,EWMAC(64_256) Slowest Trend,trend_following,ewmac_trend_crossover,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_carry_v1,Robert Carver,Carry Rule (Futures),factor,futures_carry,futures,daily,long_short,book,Systematic Trading / AFTS,2015,4,extracted
+carver_breakout_20_v1,Robert Carver,Breakout(20) Channel,trend_following,channel_breakout,futures,daily,long_short,blog_post,A simple breakout trading rule,2016,5,extracted
+carver_breakout_80_v1,Robert Carver,Breakout(80) Channel,trend_following,channel_breakout,futures,daily,long_short,blog_post,A simple breakout trading rule,2016,5,extracted
+carver_skew_v1,Robert Carver,Skew Trading Rule,factor,realized_skew,futures,daily,long_short,blog_post,Skew and Kurtosis as trading rules,2020,4,extracted
+carver_assettrend_v1,Robert Carver,Asset-Class Trend,trend_following,cross_sectional_trend,futures,daily,long_short,blog_post,Some more trading rules / pysystemtrade assettrend,2017,4,extracted
+carver_relmomentum_v1,Robert Carver,Relative Momentum,momentum,cross_sectional_momentum,futures,daily,long_short,blog_post,Risk targeting and dynamic asset allocation,2019,4,extracted
+carver_acceleration_v1,Robert Carver,Acceleration (EWMAC of EWMAC),trend_following,trend_acceleration,futures,daily,long_short,book,Advanced Futures Trading Strategies,2023,4,extracted
+carver_fast_meanrev_v1,Robert Carver,Fast Mean Reversion,mean_reversion,vol_normalised_z_score,futures,daily,long_short,book,Advanced Futures Trading Strategies,2023,4,extracted
+carver_vol_target_overlay_v1,Robert Carver,Volatility-Targeted Position Sizing Overlay,trend_following,portfolio_overlay_position_sizing,futures;equities;etfs;fx;bonds,daily,long_short,book,Systematic Trading / Leveraged Trading / AFTS,2015,5,extracted
+clenow_core_trend_v1,Andreas Clenow,Core CTA Trend (FTT),trend_following,donchian_breakout_with_atr_stop,futures,daily,long_short,book,Following the Trend,2013,5,extracted
+clenow_stocks_on_the_move_v1,Andreas Clenow,Stocks on the Move (Equity Momentum),momentum,equity_exponential_regression_momentum,equities,weekly,long_only,book,Stocks on the Move,2015,5,extracted
+clenow_te_simple_trend_v1,Andreas Clenow,TE Simple Long-Only Equity Trend,trend_following,simple_long_only_ma_filter,equities;etfs,daily,long_only,book,Trading Evolved,2019,5,extracted
+clenow_te_global_macro_momentum_v1,Andreas Clenow,TE Global Macro Asset Class Momentum,momentum,global_asset_class_rotation,etfs,monthly,long_only,book,Trading Evolved,2019,5,extracted
+clenow_te_counter_trend_v1,Andreas Clenow,TE Counter-Trend Mean Reversion,mean_reversion,bollinger_extreme_with_trend_filter,equities,daily,long_only,book,Trading Evolved,2019,4,extracted
+clenow_te_curve_trading_v1,Andreas Clenow,TE Curve Trading (Calendar Spread),factor,futures_calendar_spread,futures,daily,long_short,book,Trading Evolved,2019,4,extracted
+clenow_te_carry_v1,Andreas Clenow,TE Futures Carry,factor,futures_carry,futures,daily,long_short,book,Trading Evolved,2019,4,extracted
+clenow_stocks_on_move_long_short_v1,Andreas Clenow,Stocks on the Move Long/Short,momentum,equity_momentum_long_short,equities,weekly,long_short,book,Stocks on the Move,2015,4,extracted
+clenow_ftt_diversified_breakout_v1,Andreas Clenow,FTT Slow Multi-Window Breakout,trend_following,donchian_breakout_with_atr_stop_slow_variant,futures,daily,long_short,book,Following the Trend,2022,4,extracted
+clenow_te_combined_portfolio_v1,Andreas Clenow,TE Combined Multi-Strategy Portfolio,trend_following,multi_strategy_portfolio,equities;etfs;futures,daily,long_short,book,Trading Evolved,2019,4,extracted
+gray_quant_value_v1,Wesley Gray,Quantitative Value Full Screen,factor,quant_value_multi_factor,equities,monthly,long_only,book,Quantitative Value,2012,4,extracted
+gray_quant_momentum_v1,Wesley Gray,Quantitative Momentum Full Screen,momentum,equity_smooth_momentum,equities,quarterly,long_only,book,Quantitative Momentum,2016,5,extracted
+gray_qmom_etf_v1,Wesley Gray,QMOM ETF Live Implementation,momentum,equity_smooth_momentum_etf_methodology,equities,quarterly,long_only,paper,QMOM ETF Methodology,2015,4,extracted
+gray_qval_etf_v1,Wesley Gray,QVAL ETF Live Implementation,factor,quant_value_etf_methodology,equities,quarterly,long_only,paper,QVAL ETF Methodology,2014,4,extracted
+gray_tmom_v1,Wesley Gray,TMOM Time-Series Absolute Momentum,trend_following,time_series_absolute_momentum,etfs,monthly,long_only,blog_post,Avoiding the Big Drawdown / Trend-Following Rules,2015,5,extracted
+gray_ma12_trend_v1,Wesley Gray,12-Month Moving Average Trend,trend_following,long_term_moving_average_filter,etfs,monthly,long_only,blog_post,Alpha Architect Trend Following,2015,5,extracted
+gray_robust_asset_allocation_v1,Wesley Gray,Robust Asset Allocation (RAA),trend_following,composite_dual_signal_tactical_allocation,etfs,monthly,long_only,paper,RAA Education Paper,2015,5,extracted
+gray_dual_momentum_aa_v1,Wesley Gray,Dual Momentum AA Variant,momentum,dual_momentum_global_equity,etfs,monthly,long_only,blog_post,RAA vs Dual Momentum Horserace,2015,5,extracted
+gray_global_value_momentum_trend_v1,Wesley Gray,Global Value-Momentum-Trend (GVMT),factor,combined_value_momentum_with_trend_overlay,equities,quarterly,long_only,paper,Global Value Momentum Trend Philosophy,2016,4,extracted
+gray_magic_formula_v1,Wesley Gray,Magic Formula (Greenblatt baseline),factor,cheapness_quality_combination,equities,monthly,long_only,book,Quantitative Value (Magic Formula chapter),2012,5,extracted
+gray_ebit_ev_value_v1,Wesley Gray,Pure EBIT/EV Cheapness Decile,factor,pure_cheapness_deep_value,equities,monthly,long_only,book,Quantitative Value (Cheapness chapter),2012,5,extracted
+gray_intl_quant_momentum_v1,Wesley Gray,IMOM International Quant Momentum,momentum,equity_smooth_momentum_international,equities,quarterly,long_only,paper,Frog in the Pan International Evidence,2017,4,extracted
+chan_pairs_engle_granger_v1,Ernest Chan,Pairs Trading Engle-Granger Cointegration,pairs,cointegration_pairs_engle_granger,equities;etfs,daily,long_short,book,Algorithmic Trading,2013,5,extracted
+chan_pairs_johansen_v1,Ernest Chan,Cointegration Baskets Johansen,pairs,cointegration_basket_johansen,equities;etfs,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_kalman_filter_pairs_v1,Ernest Chan,Pairs Trading Kalman Dynamic Hedge,pairs,cointegration_pairs_kalman,equities;etfs,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_bollinger_meanrev_v1,Ernest Chan,Bollinger Band Mean Reversion (Chan),mean_reversion,bollinger_band_with_neutral_zone,equities;etfs,daily,long_short,book,Algorithmic Trading,2013,5,extracted
+chan_hurst_regime_filter_v1,Ernest Chan,Hurst Exponent Regime Filter,factor,regime_filter_overlay,equities;etfs;futures,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_variance_ratio_filter_v1,Ernest Chan,Variance Ratio Test Regime Filter,factor,regime_filter_overlay_statistical,equities;etfs;futures,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_intraday_leveraged_etf_momentum_v1,Ernest Chan,Intraday Leveraged ETF Momentum (Trend Day),momentum,intraday_leveraged_etf_rebalance,etfs,intraday_15min,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_overnight_gap_momentum_v1,Ernest Chan,Overnight Gap Momentum,momentum,overnight_gap_continuation,futures;etfs,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_etf_pairs_ewa_ewc_v1,Ernest Chan,EWA/EWC Country ETF Pair,pairs,country_etf_pair,etfs,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_volatility_term_structure_v1,Ernest Chan,VIX/VXX Volatility Term Structure,factor,volatility_term_structure,etfs,daily,long_short,blog_post,Mean reversion momentum and volatility term structure,2016,4,extracted
+chan_seasonal_futures_v1,Ernest Chan,Seasonal Commodity Futures Patterns,seasonal,commodity_calendar_seasonality,futures,daily,long_short,book,Algorithmic Trading,2013,4,extracted
+chan_factor_etf_arb_v1,Ernest Chan,Factor Model ETF Arbitrage,factor,factor_model_residual_meanrev,etfs,daily,long_short,book,Machine Trading,2017,4,extracted
+raschke_holy_grail_v1,Linda Raschke,Holy Grail ADX 20-EMA Pullback,trend_following,pullback_to_moving_average_in_strong_trend,equities;futures;etfs,daily,long_short,book,Street Smarts,1995,4,extracted
+raschke_anti_v1,Linda Raschke,Anti Stochastic First Pullback,trend_following,stochastic_first_pullback_continuation,equities;futures;etfs,daily,long_short,book,Street Smarts,1995,4,extracted
+raschke_turtle_soup_long_v1,Linda Raschke,Turtle Soup (Long) Failed 20-Day Low,mean_reversion,failed_breakout_fade,equities;futures;etfs,daily,long_only,book,Street Smarts,1995,5,extracted
+raschke_turtle_soup_short_v1,Linda Raschke,Turtle Soup (Short) Failed 20-Day High,mean_reversion,failed_breakout_fade_short,equities;futures;etfs,daily,short_only,book,Street Smarts,1995,5,extracted
+raschke_80_20_v1,Linda Raschke,80-20 Range-Extreme Reversal,mean_reversion,range_extreme_close_reversal,equities;futures;etfs,daily,long_short,book,Street Smarts,1995,4,extracted
+raschke_3_10_oscillator_v1,Linda Raschke,3-10 Oscillator First Cross,trend_following,macd_style_oscillator_first_cross,equities;futures;etfs,daily,long_short,blog_post,LBR Group / Terminology and Setups,1981,4,extracted
+raschke_id_nr4_v1,Linda Raschke,ID/NR4 Volatility Expansion Breakout,trend_following,volatility_contraction_breakout,equities;futures;etfs,daily,long_short,book,Street Smarts,1995,5,extracted
+raschke_nr7_v1,Linda Raschke,NR7 Narrow Range Breakout,trend_following,volatility_contraction_breakout_7bar,equities;futures;etfs,daily,long_short,book,Street Smarts,1995,5,extracted
+bandy_rsi2_meanrev_v1,Howard Bandy,Bandy RSI(2) Mean Reversion,mean_reversion,oversold_pullback_short_holding,equities;etfs,daily,long_only,book,Mean Reversion Trading Systems,2013,4,extracted
+bandy_zscore_meanrev_v1,Howard Bandy,Bandy Z-Score Mean Reversion,mean_reversion,zscore_deviation_from_mean,equities;etfs,daily,long_only,book,Mean Reversion Trading Systems,2013,4,extracted
+bandy_bollinger_meanrev_v1,Howard Bandy,Bandy Bollinger Mean Reversion,mean_reversion,bollinger_band_extreme_deviation,equities;etfs,daily,long_only,book,Mean Reversion Trading Systems,2013,5,extracted
+bandy_walk_forward_overlay_v1,Howard Bandy,Walk-Forward Optimization Overlay,factor,validation_methodology_overlay,equities;etfs;futures,daily,long_short,book,Quantitative Trading Systems / Modeling Performance,2007,5,extracted
+bandy_monte_carlo_validation_v1,Howard Bandy,Monte Carlo Validation Methodology,factor,validation_methodology_monte_carlo,equities;etfs;futures,daily,long_short,book,Modeling Trading System Performance,2011,5,extracted
+bandy_health_check_overlay_v1,Howard Bandy,System Health Monitoring Overlay,factor,live_monitoring_overlay,equities;etfs;futures,daily,long_short,book,Modeling Trading System Performance,2011,5,extracted
+kaufman_kama_trend_v1,Perry Kaufman,KAMA Adaptive Trend Following,trend_following,adaptive_moving_average_slope,equities;etfs;futures,daily,long_short,book,Smarter Trading,1995,5,extracted
+kaufman_efficiency_ratio_filter_v1,Perry Kaufman,Efficiency Ratio Regime Filter,factor,regime_filter_overlay_efficiency_ratio,equities;etfs;futures,daily,long_short,book,Smarter Trading,1995,4,extracted
+kaufman_adaptive_breakout_v1,Perry Kaufman,Adaptive Channel Breakout,trend_following,adaptive_channel_breakout,equities;etfs;futures,daily,long_short,book,Trading Systems and Methods,1987,4,extracted
+kaufman_adaptive_momentum_v1,Perry Kaufman,Adaptive Lookback Momentum,momentum,adaptive_lookback_momentum,equities;etfs;futures,daily,long_short,book,Trading Systems and Methods,1987,4,extracted
+kaufman_seasonal_v1,Perry Kaufman,Kaufman Seasonal Patterns,seasonal,cross_year_calendar_seasonal,futures;equities;etfs,daily,long_short,book,Trading Systems and Methods,1987,4,extracted
+kaufman_intraday_breakout_v1,Perry Kaufman,Intraday Opening Range Breakout,trend_following,intraday_opening_range_breakout,equities;etfs;futures,intraday_15min,long_short,book,Trading Systems and Methods,1987,4,extracted
+lopez_de_prado_hrp_v1,Marcos Lopez de Prado,Hierarchical Risk Parity Portfolio,factor,portfolio_construction_overlay,equities;etfs;futures;bonds,monthly,long_only,paper,Building Diversified Portfolios SSRN 2016 / AFML Ch16,2016,5,extracted
+lopez_de_prado_triple_barrier_v1,Marcos Lopez de Prado,Triple-Barrier Labeling Method,factor,ml_labeling_methodology_overlay,equities;etfs;futures,daily,long_short,book,Advances in Financial Machine Learning Ch3,2018,5,extracted
+lopez_de_prado_meta_labeling_v1,Marcos Lopez de Prado,Meta-Labeling Secondary ML Filter,factor,ml_signal_filtering_overlay,equities;etfs;futures,daily,long_short,book,Advances in Financial Machine Learning Ch3.6,2018,4,extracted
+lopez_de_prado_frac_diff_v1,Marcos Lopez de Prado,Fractional Differentiation Features,factor,ml_feature_engineering_overlay,equities;etfs;futures,daily,long_short,book,Advances in Financial Machine Learning Ch5,2018,5,extracted
+lopez_de_prado_cscv_v1,Marcos Lopez de Prado,CSCV Backtest Overfit Detection,factor,backtest_validation_overfit_detection,equities;etfs;futures,daily,long_short,paper,Probability of Backtest Overfitting / AFML Ch11-12,2014,5,extracted
+lopez_de_prado_cusum_filter_v1,Marcos Lopez de Prado,CUSUM Event-Based Sampling Filter,factor,event_based_sampling_overlay,equities;etfs;futures,daily,long_short,book,Advances in Financial Machine Learning Ch2-3,2018,5,extracted
+sinclair_variance_risk_premium_v1,Euan Sinclair,Variance Risk Premium Harvest,volatility,variance_risk_premium_harvest,options,monthly,short_only,book,Volatility Trading,2013,4,extracted
+sinclair_term_structure_premium_v1,Euan Sinclair,IV Term Structure Premium,volatility,implied_volatility_term_structure,options,weekly,long_short,book,Positional Option Trading,2020,4,extracted
+sinclair_pead_call_spread_v1,Euan Sinclair,PEAD Short-Dated Call Spread,volatility,earnings_effect_directional_options,options,daily,long_only,book,Positional Option Trading,2020,4,extracted
+sinclair_iv_rv_gap_v1,Euan Sinclair,IV-RV Gap Trade,volatility,implied_minus_realized_spread,options,monthly,long_short,book,Volatility Trading,2013,4,extracted
+sinclair_tail_hedged_short_premium_v1,Euan Sinclair,Tail-Hedged Short Premium,volatility,short_premium_with_tail_hedge,options,monthly,short_only,book,Volatility Trading / Positional Option Trading,2020,4,extracted
+longmore_risk_premia_portfolio_v1,Kris Longmore,Risk Premia Portfolio with Momentum Tilt,factor,multi_asset_risk_premia_harvest,equities;etfs;bonds,monthly,long_only,blog_post,Robot Wealth Bootcamp,2020,4,extracted
+longmore_crypto_carry_v1,Kris Longmore,Crypto Perpetual Funding Carry,factor,crypto_perp_funding_carry,crypto,daily,long_short,blog_post,Robot Wealth Carry Research,2022,4,extracted
+longmore_turn_of_month_v1,Kris Longmore,Turn-of-Month Equity Effect,seasonal,turn_of_month_equity,etfs,daily,long_only,blog_post,Robot Wealth Bootcamp,2020,5,extracted
+longmore_index_rebalance_v1,Kris Longmore,Index Rebalance Flow Front-Running,factor,index_inclusion_flow_anticipation,equities,daily,long_short,blog_post,Robot Wealth Edge Database,2020,4,extracted
+longmore_vix_positioning_v1,Kris Longmore,VIX Term-Structure Positioning,volatility,vix_term_structure_positioning,etfs,daily,long_short,blog_post,Robot Wealth Bootcamp,2020,4,extracted
+longmore_crypto_seasonality_v1,Kris Longmore,Crypto Seasonality Patterns,seasonal,crypto_calendar_pattern,crypto,daily,long_short,blog_post,Robot Wealth Bootcamp,2022,4,extracted
+longmore_crypto_stat_arb_v1,Kris Longmore,Crypto Cross-Sectional Stat Arb,pairs,crypto_cross_sectional_factor,crypto,daily,long_short,blog_post,Robot Wealth Crypto Alphas,2022,4,extracted
+longmore_etf_rotation_zorro_v1,Kris Longmore,ETF Rotation Third-Trading-Day Rebalance,momentum,monthly_etf_rotation_with_third_day_rebalance,etfs,monthly,long_only,blog_post,ETF Rotation Strategies in Zorro,2018,5,extracted

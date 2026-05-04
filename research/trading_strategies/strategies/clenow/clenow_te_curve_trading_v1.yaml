@@ -1,0 +1,134 @@
+strategy_id: clenow_te_curve_trading_v1
+name: "Trading Evolved — Curve Trading (Calendar Spread)"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved"
+  chapter_or_url: "Curve trading / calendar spread chapter; companion Zipline futures code"
+  publication_year: 2019
+  page_or_section: "Curve trading chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: futures_calendar_spread
+asset_class: [futures]
+specific_instruments: "Futures with multiple liquid contract months — energy (CL, NG), metals (GC, SI), grains (ZC, ZS, ZW), rates"
+timeframe: daily
+holding_period_typical: "Weeks to months"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Futures contracts with at least 6 months of liquid forward curve"
+liquidity_filter: "Front 4 contract months must each have sufficient daily volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Long-curve / short-curve spread trade based on shape of the futures curve.
+
+    1. For each underlying, identify front (P_front) and a deferred contract
+       at fixed offset (e.g., 6 months out, P_deferred).
+    2. Compute curve_slope:
+         curve_slope = (P_deferred - P_front) / P_front × annualisation_factor
+       (positive = contango; negative = backwardation)
+    3. Smooth: curve_slope_smooth = EWMA(curve_slope, span=60)
+    4. Z-score the smoothed slope across the curve's own history (not
+       cross-instrument): z = (curve_slope_smooth - mean_3yr) / stdev_3yr
+    5. Entry:
+         If z < -1: LONG front, SHORT deferred (bet on curve normalising
+                    — backwardation pays roll yield)
+         If z > +1: SHORT front, LONG deferred (bet on contango normalising)
+
+    Position is dollar-neutral: equal cash on each leg.
+  indicators_used:
+    - name: curve_slope
+      lookback_period: "1 day (point-in-time)"
+      formula_reference: "(P_deferred - P_front) / P_front × (12 / months_between)"
+      applied_to: "futures curve prices"
+    - name: EWMA
+      lookback_period: 60
+      formula_reference: "ewm(span=60)"
+      applied_to: "curve_slope series"
+    - name: rolling_zscore
+      lookback_period: 756
+      formula_reference: "(x[t] - rolling_mean(x, 756)) / rolling_std(x, 756); 756 trading days ≈ 3 years"
+      applied_to: "smoothed curve slope"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: dollar_neutral_spread
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: "Sized to a target annualised vol per spread (e.g., 5%)"
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: "All eligible curves simultaneously"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when |z| < 0.25 (mean-reverted to neutral)"
+  stop_loss: "Optional: exit when |z| > 3 (signal extends instead of reverting)"
+  time_stop: "Optional: 90-bar time stop"
+  trailing_stop: None
+  signal_reversal: "Reverse position when z crosses zero"
+  exit_priority: "Profit target on z-reversion; stop loss on z-extension"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Multiple curve trades within same asset class are correlated — concentration cap"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "756 bars (z-score window) per curve"
+  benchmark: "BTOP50 / cash"
+  starting_capital: "$1M+ for futures"
+  commission_assumption: "Per-contract on each leg"
+  slippage_assumption: "1 spread per leg per round-trip"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Energy, metals, grains, rates curves"
+  cagr: "Modest standalone returns"
+  sharpe: "Author shows positive Sharpe; complementary to outright trend trades"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Curve trades are dollar-neutral, so they have low correlation with directional trend trades. Used as portfolio diversifier."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use front-vs-2nd-month spread (M1-M2)"
+  - "Use butterfly: M1 - 2*M2 + M3"
+  - "Add seasonality overlay (e.g., natural gas winter pattern)"
+  - "Cross-curve: long energy curve, short grains curve when divergent"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Deferred contract': default to 6 months out where available; some
+    futures curves are quarterly (rates) — adjust accordingly.
+  - Z-score window 3 years (756 trading days) is the book example;
+    curves with shorter history use full-history z-score.
+  - Annualisation factor depends on contract spacing.
+look_ahead_bias_warnings: "Standard close-of-day signal."
+survivorship_bias_warnings: "Negligible (futures curves with proper roll handling)."
+data_snooping_warnings: "Z-score thresholds and EWMA span are choices."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_carry_v1
+  - clenow_te_carry_v1
+prerequisites: None

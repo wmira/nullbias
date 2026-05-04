@@ -1,0 +1,129 @@
+strategy_id: carver_ewmac_8_32_v1
+name: "EWMAC(8,32) — Medium-Fast Trend"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Systematic Trading / Advanced Futures Trading Strategies"
+  chapter_or_url: "ST 2015 Appendix B; AFTS 2023; pysystemtrade GitHub"
+  publication_year: 2015
+  page_or_section: "EWMAC trading rule"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: ewmac_trend_crossover
+asset_class: [futures]
+specific_instruments: "Diversified futures universe"
+timeframe: daily
+holding_period_typical: "Weeks; turnover ~6× per year"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified liquid futures"
+liquidity_filter: "Cost-per-trade filter (looser than EWMAC(2,8) and (4,16))"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Continuous-forecast rule, parameters:
+      L_fast = 8
+      L_slow = 32
+      forecast_scalar = 5.95
+      forecast_cap = ±20
+      vol_lookback = 25 days
+
+    1. fast_ema = EWMA(price, span=8)
+    2. slow_ema = EWMA(price, span=32)
+    3. raw_xover = fast_ema - slow_ema
+    4. price_vol = stdev of daily price diffs over 25 days
+    5. forecast = (raw_xover / price_vol) × 5.95
+    6. capped_forecast = clip(forecast, -20, +20)
+  indicators_used:
+    - name: EWMA
+      lookback_period: 8
+      formula_reference: "ewm(span=8)"
+      applied_to: close
+    - name: EWMA
+      lookback_period: 32
+      formula_reference: "ewm(span=32)"
+      applied_to: close
+    - name: stdev
+      lookback_period: 25
+      formula_reference: "Stdev of daily price diffs"
+      applied_to: "price differences"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 5.95
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Portfolio-level IDM"
+  sector_concentration_limits: "Asset-class FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "32 bars EWMA + 25 vol"
+  benchmark: "Carver system / BTOP50"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone ~0.4–0.5; competitive with (16,64)"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~6 round-trips per instrument per year"
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Return-stdev variant"
+  - "Uncapped forecast"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: "Same conventions as other EWMAC YAMLs."
+look_ahead_bias_warnings: "Same as EWMAC family."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Calibrated parameters."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_2_8_v1
+  - carver_ewmac_4_16_v1
+  - carver_ewmac_16_64_v1
+  - carver_ewmac_32_128_v1
+  - carver_ewmac_64_256_v1
+prerequisites: "Volatility-target overlay"

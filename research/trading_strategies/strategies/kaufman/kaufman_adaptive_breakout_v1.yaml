@@ -1,0 +1,130 @@
+strategy_id: kaufman_adaptive_breakout_v1
+name: "Adaptive Channel Breakout (Vol-Adjusted Width)"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Trading Systems and Methods (multiple editions)"
+  chapter_or_url: "Adaptive breakout chapter"
+  publication_year: 1987
+  page_or_section: "Adaptive breakout / channel chapters"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: adaptive_channel_breakout
+asset_class: [equities, etfs, futures]
+specific_instruments: "Liquid instruments suitable for breakout trading"
+timeframe: daily
+holding_period_typical: "Weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid instruments"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Channel that adapts width based on recent volatility:
+
+    1. Mid-line: SMA(close, 20)
+    2. Channel width: K × ATR(20) where K is volatility-adaptive:
+         - In high-volatility regimes (ATR ratio > 1.5): K = 3
+         - In normal regimes: K = 2
+         - In low-volatility regimes: K = 1.5
+       (Channel width ADAPTS so that breakouts require proportionally
+        larger moves in volatile markets, smaller in quiet markets.)
+    3. Upper channel = mid + K × ATR(20)
+    4. Lower channel = mid - K × ATR(20)
+
+    LONG when close > upper_channel
+    SHORT when close < lower_channel
+    Exit when close crosses back through mid-line.
+  indicators_used:
+    - name: SMA
+      lookback_period: 20
+      formula_reference: simple
+      applied_to: close
+    - name: ATR
+      lookback_period: 20
+      formula_reference: "Wilder ATR"
+      applied_to: high_low_close
+    - name: ATR_ratio
+      lookback_period: "Current ATR / 252-day SMA of ATR"
+      formula_reference: "Used to determine volatility regime"
+      applied_to: ATR
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: atr_volatility_targeted
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: 2
+  scaling_rules: "Position = (equity × 1%) / (2 × ATR(20))"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "Opposite channel breakout"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: "Trail mid-line"
+  signal_reversal: "Mid-line cross"
+  exit_priority: "Stop → mid-line cross"
+  exit_price: market
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "252 bars (for ATR ratio baseline)"
+  benchmark: "Underlying buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple decades"
+  test_universe: "Diverse"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Adaptive width avoids the over-trading problem of fixed-width Bollinger or Donchian channels in volatile regimes."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use stdev-based instead of ATR-based channel"
+  - "Different K values"
+  - "Combine with KAMA for smoothed mid-line"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - K mapping (1.5 / 2 / 3) is heuristic; document and sweep.
+  - ATR ratio threshold (1.5×) for vol regime is heuristic.
+look_ahead_bias_warnings: "Standard."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Multi-knob; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - kaufman_kama_trend_v1
+  - carver_breakout_20_v1
+  - clenow_core_trend_v1
+prerequisites: None

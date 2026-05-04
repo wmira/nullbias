@@ -1,0 +1,137 @@
+strategy_id: longmore_crypto_seasonality_v1
+name: "Crypto Seasonality Patterns"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Robot Wealth crypto seasonality research"
+  chapter_or_url: "robotwealth.com bootcamp"
+  publication_year: 2022
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: seasonal
+sub_category: crypto_calendar_pattern
+asset_class: [crypto]
+specific_instruments: "BTC, ETH spot or perpetuals"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Major crypto (BTC, ETH)"
+liquidity_filter: "Highly liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Documented patterns in crypto markets:
+
+    A) Day-of-week effect:
+       Returns are systematically different on certain weekdays
+       (e.g., Mondays positive in some periods).
+
+    B) Time-of-day effect (crypto trades 24/7):
+       Returns concentrated in certain hour-bands (US/Asia overlap, etc.)
+
+    C) Halving-cycle effect:
+       BTC has 4-year halving cycles; returns concentrated in
+       certain phases.
+
+    D) Holiday / Lunar New Year effect:
+       Asian holidays correlate with reduced volume / different behaviour.
+
+    Trade rule template:
+    1. Compute average return over last 5+ years for each calendar
+       position (day-of-week, hour, week-of-year).
+    2. Identify positions with statistically significant non-zero
+       average return (t-test p < 0.05).
+    3. ENTER LONG at positions with significant positive avg return.
+    4. ENTER SHORT at positions with significant negative avg return.
+    5. EXIT at end of position window.
+  indicators_used:
+    - name: rolling_seasonal_mean_return
+      lookback_period: "5+ years"
+      formula_reference: "Mean return at each calendar position over prior years"
+      applied_to: returns
+    - name: t_test
+      lookback_period: "5+ years"
+      formula_reference: "One-sample t-test against null of zero mean"
+      applied_to: "calendar-grouped returns"
+  entry_price: close_signal_bar
+  entry_time: "Calendar-driven"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 0.5
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Smaller per-trade than equity strategies due to crypto vol"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: NOT_SPECIFIED
+  stop_loss: "2 × ATR(20)"
+  time_stop: "End of seasonal window"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Time stop dominant"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: "daily or hourly"
+  minimum_history_required: "5+ years per asset"
+  benchmark: "BTC buy-and-hold"
+  starting_capital: 50000
+  commission_assumption: "10 bps per round-trip"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "BTC since 2014; ETH since 2017"
+  test_universe: "Major crypto"
+  cagr: NOT_SPECIFIED
+  sharpe: "Modest standalone Sharpe; useful as portfolio diversifier"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Calendar-cycle determined"
+  notes: "Crypto patterns are less stable than equity calendar patterns due to short history. Treat as supplementary signal."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Halving cycle phases (long pre-halving, short post-halving)"
+  - "Asian-session vs US-session arbitrage"
+  - "Apply on alts where seasonality is stronger"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Statistical significance threshold (p < 0.05) doesn't survive
+    Bonferroni for multi-position testing — many calendar positions
+    means high false-discovery rate.
+  - Crypto's short history limits sample sizes; OOS rigour is critical.
+look_ahead_bias_warnings: "Calendar known in advance; no look-ahead."
+survivorship_bias_warnings: "Material on alt coins."
+data_snooping_warnings: "Severe — many calendar positions tested implicitly."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_seasonal_futures_v1
+  - kaufman_seasonal_v1
+  - longmore_crypto_carry_v1
+prerequisites: "Crypto exchange access"

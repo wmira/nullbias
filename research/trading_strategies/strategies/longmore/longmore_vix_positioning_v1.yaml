@@ -1,0 +1,118 @@
+strategy_id: longmore_vix_positioning_v1
+name: "VIX Term-Structure Positioning"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Robot Wealth VIX research; bootcamp materials"
+  chapter_or_url: "robotwealth.com bootcamp"
+  publication_year: 2020
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: vix_term_structure_positioning
+asset_class: [etfs]
+specific_instruments: "VIX index, VXX/VIXY (long vol), SVXY (-0.5x short vol), VIX futures"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "VIX-related ETFs and futures"
+liquidity_filter: "VXX is highly liquid; SVXY moderate"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "XIV no longer trades (delisted Feb 2018)"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Position based on VIX term-structure shape:
+
+    1. Compute VX1 (front future) / VIX (spot) ratio.
+    2. If ratio > 1.05 (contango): SHORT vol via SVXY long
+       OR sell VIX call spreads.
+    3. If ratio < 0.98 (backwardation): LONG vol via VXX
+       OR buy VIX call spreads.
+    4. Optional: scale position by ratio magnitude.
+
+    Sinclair-equivalent overlay: Robot Wealth's bootcamp version
+    emphasises position-sizing discipline — vol ETFs can move 30%+
+    in a day.
+  indicators_used:
+    - name: VX1_VIX_ratio
+      lookback_period: 1
+      formula_reference: "front month VIX future / VIX spot"
+      applied_to: "VIX complex"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: vol_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 15
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Smaller than equity positions due to vol-product extreme moves"
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "20% adverse move on VXX/SVXY"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: "Term-structure flip"
+  exit_priority: "Stop → reversal"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "VIX > 35 → close all positions and re-evaluate"
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "VIX futures since 2004; VXX since 2009"
+  benchmark: "Cash"
+  starting_capital: 50000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10-15 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Since vol-ETF inception"
+  test_universe: "VIX complex"
+  cagr: "Profitable in normal regimes; severely punished in vol spikes"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Catastrophic in Feb 2018 / Mar 2020 events"
+  win_rate: "70%+ in stable regimes"
+  avg_win_loss_ratio: "Many small wins offset by occasional large losses"
+  num_trades: NOT_SPECIFIED
+  notes: "Robot Wealth specifically warns about regime risk; included in bootcamp as a lesson in tail-risk-aware position sizing."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Pair with SPY for delta hedge"
+  - "Use options spreads instead of ETFs"
+  - "Limit to small portion of portfolio (<5%)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - SVXY is now -0.5x (post-Feb-2018). XIV no longer exists.
+  - VXX is now VXX-II (ticker change post-rebrand).
+look_ahead_bias_warnings: "Same-day close fills; live execution requires intraday."
+survivorship_bias_warnings: "Major — XIV pre-2018 backtests over-state realised performance."
+data_snooping_warnings: "Term-structure thresholds heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_volatility_term_structure_v1
+  - sinclair_term_structure_premium_v1
+prerequisites: "Vol product trading authorization; tail-risk discipline"

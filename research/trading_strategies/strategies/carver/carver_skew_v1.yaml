@@ -1,0 +1,134 @@
+strategy_id: carver_skew_v1
+name: "Skew Trading Rule (365-day)"
+author: Robert Carver
+
+source:
+  type: blog_post
+  title: "Skew and Kurtosis as trading rules / Skew and Trend following"
+  chapter_or_url: "https://qoppac.blogspot.com/2020/01/skew-and-kurtosis-as-trading-rules.html and /2019/02/skew-and-trend-following.html ; AFTS Strategy 25"
+  publication_year: 2020
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: realized_skew
+asset_class: [futures]
+specific_instruments: "Diversified futures universe"
+timeframe: daily
+holding_period_typical: "Months — very low turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures with sufficient history (≥365 daily returns)"
+liquidity_filter: "Standard cost filter"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Continuous-forecast rule based on realised skewness of returns.
+
+    1. Compute daily returns: r[t] = (close[t] / close[t-1]) - 1
+    2. realised_skew = skewness(r[t-364..t]) over a 365-day rolling window
+       (Pearson moment skewness; scipy.stats.skew or pandas .skew())
+    3. Sign convention: SHORT positively-skewed assets, LONG negatively-skewed
+       (rationale: assets with negative skew earn risk premium for tail risk)
+    4. raw_signal = -realised_skew
+    5. Normalise across cross-section (optional but recommended in Carver's
+       writing): subtract the cross-sectional mean of -skew across all
+       instruments.
+    6. forecast = (raw_signal − cross_sectional_mean) × forecast_scalar
+       forecast_scalar empirically ≈ 60 (Carver's calibration for span=365)
+    7. capped_forecast = clip(forecast, -20, +20)
+
+    Long when negatively skewed (forecast > 0 by sign-flip).
+    Short when positively skewed.
+  indicators_used:
+    - name: realised_skewness
+      lookback_period: 365
+      formula_reference: "Pearson moment skewness of daily returns: E[((r-mean)/sigma)^3]. Pandas: returns.rolling(365).skew()"
+      applied_to: returns
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 60.0
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments with valid skew estimate"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM — skew often correlates with carry within asset classes"
+  sector_concentration_limits: "FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "365 bars to seed the skew window"
+  benchmark: "Carver diversified system / BTOP50"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple decades through 2020 in Carver's blog tests"
+  test_universe: "Diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author's tests: standalone Sharpe ~0.33 for the 365-day vanilla skew rule"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Carver explicitly tests several skew rule speeds and finds slower
+    rules (longer lookbacks) outperform faster ones. The 365-day rule is
+    the canonical 'vanilla skew'. Faster skew variants underperformed.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "180-day skew (faster)"
+  - "Realised-vol-conditioned skew ('skewK_abs_90')"
+  - "Cross-asset rank-based skew (no normalisation, just rank)"
+  - "Combine with kurtosis as a related rule"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Skewness convention: Pearson moment (centered, normalised by σ³).
+    Pandas default uses bias-adjusted Fisher-Pearson; statsmodels.tsa
+    has options. Document the chosen library/parameter.
+  - Cross-sectional demean: optional but improves Sharpe in Carver's
+    tests. Default to demeaned for the v1.
+  - Sign of forecast: NEGATIVE skew is bullish (long). Easy to invert by
+    accident.
+look_ahead_bias_warnings: "Skew computed over closed window of 365 bars; no leakage."
+survivorship_bias_warnings: "Negligible (futures with proper roll handling)."
+data_snooping_warnings: "Skew rule has demonstrably weaker performance OOS than the carry/EWMAC family."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_carry_v1
+  - carver_ewmac_64_256_v1
+prerequisites: "Volatility-target overlay"

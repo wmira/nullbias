@@ -1,0 +1,121 @@
+strategy_id: clenow_te_simple_trend_v1
+name: "Trading Evolved — Simple Long-Only Equity Trend"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved: Anyone Can Build Killer Trading Strategies in Python"
+  chapter_or_url: "Equity trend chapter — first complete strategy walkthrough; companion code on author's GitHub"
+  publication_year: 2019
+  page_or_section: "Equity trend strategy chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: simple_long_only_ma_filter
+asset_class: [equities, etfs]
+specific_instruments: "S&P 500 stocks or major ETFs"
+timeframe: daily
+holding_period_typical: "Multi-month — until 200-MA filter fails"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "S&P 500 stocks (point-in-time) OR a fixed ETF basket"
+liquidity_filter: "S&P 500 inclusion or ETF AUM threshold"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation at the close (or weekly per user preference):
+
+    1. close(t) > SMA(close, 200)[t]                  (long-term trend filter)
+    2. close(t) > close(t-90)                          (90-day positive return —
+                                                       confirms momentum)
+    3. No position currently open in this instrument
+
+    Buy at next-day open. Equal-weight allocation across qualifying names.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: ROC
+      lookback_period: 90
+      formula_reference: "(close[t] / close[t-90]) - 1"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "Next-day open after signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "1 / max_concurrent_positions"
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: "User-defined (e.g., 20-50 in book example)"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: |
+    Exit at next-day open if either:
+    - close(t) < SMA(close, 200)
+    - close(t) < close(t-90)  (90-day return turns negative)
+  exit_priority: "Any trigger fires sale"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-stock 200-SMA"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + 90 bars (ROC)"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "S&P 500"
+  cagr: "Author shows reasonable returns; underperforms Stocks on the Move but is much simpler"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Used as a teaching baseline in the book — illustrates Zipline implementation before progressing to more complex strategies."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Add ATR-based position sizing (instead of equal-weight)"
+  - "Use 100-day SMA instead of 200"
+  - "Apply to ETF universe (sector or country)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Both filters must be true simultaneously (logical AND).
+  - Equal-weight allocation rebalanced on every signal change.
+look_ahead_bias_warnings: "Same-day close signal; next-day open fill."
+survivorship_bias_warnings: "Material on stocks; negligible on ETFs."
+data_snooping_warnings: "200/90 windows are conventional; not heavily tuned."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_stocks_on_the_move_v1
+  - clenow_te_global_macro_momentum_v1
+prerequisites: None

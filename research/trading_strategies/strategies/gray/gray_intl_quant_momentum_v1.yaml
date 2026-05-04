@@ -1,0 +1,130 @@
+strategy_id: gray_intl_quant_momentum_v1
+name: "International Quantitative Momentum (IMOM)"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: paper
+  title: "Frog in the Pan Momentum: International Evidence / IMOM ETF methodology"
+  chapter_or_url: "https://medium.com/@alphaarchitect/frog-in-the-pan-momentum-international-evidence-233a19ad46b9 ; funds.alphaarchitect.com/imom"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: equity_smooth_momentum_international
+asset_class: [equities]
+specific_instruments: "International developed-market mid- and large-cap stocks (ex-US)"
+timeframe: quarterly
+holding_period_typical: "~3 months between rebalances"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - Listed on developed-market exchanges ex-US (Western Europe,
+    Japan, Hong Kong, Australia, Canada, etc.)
+  - Mid-cap or larger market cap
+  - Adequate liquidity
+  - Excluding REITs, financials, and utilities (per ETF methodology)
+liquidity_filter: "Investable size; liquidity sufficient for ETF"
+fundamental_filter: "REIT, financial, utility exclusions"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Same FIP-screened 12-2 momentum process as gray_quant_momentum_v1,
+    applied to international universe:
+
+    1. Compute 12-2 month return for all eligible stocks in local currency
+       (then USD-translate at portfolio aggregation time)
+    2. Select top decile by 12-2 momentum
+    3. Compute FIP_score for each top-decile stock
+    4. Sort by FIP ascending (smoothest first); take top 50
+    5. Equal-weight allocation
+
+    Quarterly rebalance.
+  indicators_used:
+    - name: ROC_12_2
+      lookback_period: "21 to 252 trading days"
+      formula_reference: "(close[t-21] / close[t-252]) - 1"
+      applied_to: close
+    - name: FIP_score
+      lookback_period: 252
+      formula_reference: "Same as gray_quant_momentum_v1 FIP formula"
+      applied_to: returns
+  entry_price: market_open_next_bar
+  entry_time: "Set rebalance date (Feb/May/Aug/Nov)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2  # 1/50
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 50
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Quarterly rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Per ETF methodology"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per stock"
+  benchmark: "MSCI EAFE / EAFE Momentum Index"
+  starting_capital: 100000
+  commission_assumption: "International stocks higher commissions; ETF wrapper preferable for retail"
+  slippage_assumption: "15-25 bps for international names; 5-10 for local-currency hedged"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in academic backtest; live since IMOM ETF launch (2014)"
+  test_universe: "MSCI EAFE eligible names"
+  cagr: "Author reports international momentum outperforms EAFE buy-and-hold"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "FIP factor confirmed to add value internationally — Alpha Architect's 2017 paper specifically documents this."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop FIP filter (becomes pure international 12-2 momentum)"
+  - "Currency-hedged version"
+  - "Emerging-markets variant"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Currency: returns computed in local currency for momentum ranking;
+    portfolio NAV in USD at rebalance.
+  - Country exclusions: typically follows MSCI Developed Markets ex-US;
+    document the chosen index.
+look_ahead_bias_warnings: "Same as gray_quant_momentum_v1."
+survivorship_bias_warnings: "Material — must use point-in-time international index membership."
+data_snooping_warnings: "FIP demonstrated OOS internationally per the cited paper."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_quant_momentum_v1
+  - gray_qmom_etf_v1
+  - alvarez_country_etf_rotation_v1
+prerequisites: None

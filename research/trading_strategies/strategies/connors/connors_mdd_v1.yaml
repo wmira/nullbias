@@ -1,0 +1,122 @@
+# =============================================================================
+# Connors MDD — Multiple Days Down (long-side mean reversion)
+# =============================================================================
+
+strategy_id: connors_mdd_v1
+name: "Multiple Days Down (MDD)"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "Multiple Days Up / Multiple Days Down chapter; with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "MDU/MDD chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: count_of_down_days
+asset_class: [etfs]
+specific_instruments: "Liquid US equity ETFs (SPY, QQQ, IWM, sector ETFs)"
+timeframe: daily
+holding_period_typical: "1–6 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index and sector ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t                                  # primary uptrend
+    2. close(t) < SMA(close, 5) at bar t                                    # short-term pullback
+    3. count(close[k] < close[k-1] for k in {t-4, t-3, t-2, t-1, t}) >= 4  # ≥ 4 of last 5 days were down
+    4. No position currently open in this instrument
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: SMA
+      lookback_period: 5
+      formula_reference: simple
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when close(t) > SMA(close, 5) at bar t"
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single exit"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA built into entry"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 5 bars for down-count window"
+  benchmark: "Buy-and-hold the same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps MOC"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1993–2008 in book era"
+  test_universe: "Liquid US ETFs"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports 80%+ win rate on qualifying ETFs"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Per-ETF results tabulated in book."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use 5 of last 5 days (consecutive losses) for more selectivity"
+  - "Add RSI(2) < 10 as an additional filter"
+  - "Pyramid: enter additional 50% on bar where down-count hits 5/5"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - "Dropped 4 out of 5 days" interpreted as: among the prior 5 daily closes
+    (t-4 through t inclusive), at least 4 had close[k] < close[k-1].
+    Equivalently, count of down-day flags in a rolling 5-bar window ≥ 4.
+  - Days that close exactly equal to prior close are treated as not-down.
+look_ahead_bias_warnings: "Close-of-day signal; live execution requires MOC fill or T+1 open."
+survivorship_bias_warnings: "Negligible — ETF universe."
+data_snooping_warnings: "Window=5 and threshold=4 are heuristic; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_mdu_v1
+  - connors_3day_high_low_v1
+  - connors_rsi2_v1
+prerequisites: None

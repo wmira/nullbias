@@ -1,0 +1,144 @@
+strategy_id: chan_pairs_engle_granger_v1
+name: "Pairs Trading via Engle-Granger Cointegration"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Pairs trading chapters; epchan.blogspot.com posts on cointegration"
+  publication_year: 2013
+  page_or_section: "Pairs trading / cointegration chapters"
+
+# === STRATEGY METADATA ===
+category: pairs
+sub_category: cointegration_pairs_engle_granger
+asset_class: [equities, etfs]
+specific_instruments: "Pairs of cointegrated US equities or ETFs (e.g., GLD/GDX, KO/PEP, EWA/EWC)"
+timeframe: daily
+holding_period_typical: "Days to weeks — until spread mean-reverts to zero z-score"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Cointegrated pairs from a screened candidate universe (e.g., S&P 500 stocks within sectors, sector ETFs, country ETFs)"
+liquidity_filter: "Both legs must have adequate liquidity for trading; tight bid-ask"
+fundamental_filter: "Pairs typically chosen from same sector / similar business model for economic justification"
+exclusions: "Skip pairs where cointegration breaks down recently (rolling test fails)"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Step 1 — Cointegration test (run periodically, e.g., monthly):
+      For each candidate pair (X, Y):
+      1. Run linear regression: Y_t = β × X_t + ε_t
+         → estimate hedge ratio β
+      2. Compute residual series: ε_t = Y_t - β × X_t
+      3. Apply Augmented Dickey-Fuller (ADF) test on ε_t (this is the
+         CADF / Engle-Granger 2-step procedure)
+      4. Keep pair if ADF p-value < 0.05 (residual is stationary at 95%
+         confidence) AND t-stat is sufficiently negative (Chan's
+         conservative rule: require t-stat < critical value)
+
+    Step 2 — Daily trading (for each surviving pair):
+      1. Compute current spread: spread_t = Y_t - β × X_t
+      2. Rolling z-score over last N days (typically N=20):
+           z_t = (spread_t - mean(spread, N)) / stdev(spread, N)
+      3. Entry rules:
+           If z_t < -2:    LONG spread (long Y, short β units of X)
+           If z_t > +2:    SHORT spread (short Y, long β units of X)
+      4. No position when -2 ≤ z_t ≤ 2
+
+    Position sizing: dollar-neutral — equal $ on each leg.
+  indicators_used:
+    - name: linear_regression_hedge_ratio
+      lookback_period: 252
+      formula_reference: "OLS regression of Y on X over last 252 bars; β = coefficient"
+      applied_to: "close (both legs)"
+    - name: ADF_test
+      lookback_period: 252
+      formula_reference: "Augmented Dickey-Fuller test on residual series. statsmodels.tsa.stattools.adfuller; lag selection via AIC"
+      applied_to: "residual series ε_t"
+    - name: rolling_zscore
+      lookback_period: 20
+      formula_reference: "(spread_t - mean(spread, 20)) / stdev(spread, 20)"
+      applied_to: "spread series"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day or next-day open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: dollar_neutral_per_pair
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10  # 10% of portfolio per pair (sum of both legs)
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "$X long Y + $X × β short β units of X (dollar-neutral)"
+  max_concurrent_positions: "Multiple pairs simultaneously"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when |z_t| < 0.5 (mean-reverted to neutral)"
+  stop_loss: "Optional: close when |z_t| > 4 (cointegration may be breaking down)"
+  time_stop: "Optional: 30-bar time stop if no mean reversion"
+  trailing_stop: None
+  signal_reversal: "Reverse position when z crosses zero (some implementations)"
+  exit_priority: "Profit target on z-reversion; stop loss on z-extension"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Re-test cointegration regularly (e.g., monthly); drop pairs that fail"
+  correlation_limits: "Multiple pairs in same sector are correlated — diversify"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per leg for cointegration test + 20 bars for z-score"
+  benchmark: "Cash / market-neutral benchmark"
+  starting_capital: 100000
+  commission_assumption: "$0.005/share or $0 retail; double for two legs"
+  slippage_assumption: "5-10 bps per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple years in book examples"
+  test_universe: "Various pairs (EWA/EWC, GLD/GDX, etc.)"
+  cagr: "Author shows positive Sharpe on cointegrated pairs"
+  sharpe: "Cited examples Sharpe ~1+ in original test windows"
+  max_dd: "Material when cointegration breaks down (e.g., commodity crashes)"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Chan emphasises that cointegration FAILS unpredictably — pairs that worked for years can suddenly become uncorrelated. Regular re-testing is critical."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use Johansen test instead (see chan_pairs_johansen_v1)"
+  - "Kalman filter dynamic hedge ratio (see chan_kalman_filter_pairs_v1)"
+  - "Different z-score thresholds (1.5/0.5 instead of 2/0.5)"
+  - "Apply to log prices instead of raw prices"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Use of price vs log-price vs ratio for spread construction is a
+    design choice. Chan's book discusses all three. Default to raw
+    price spread (Y - β × X).
+  - Hedge ratio β estimated on a rolling window vs once at the start —
+    rolling is more robust; this YAML uses 252-day rolling.
+  - ADF test lag selection: typically AIC-optimal; statsmodels default.
+look_ahead_bias_warnings: "Re-test cointegration on out-of-sample data; in-sample β creates curve-fitting risk."
+survivorship_bias_warnings: "Material on stock pairs; minor on ETFs."
+data_snooping_warnings: |
+  - Pair-selection process from a large candidate set introduces
+    multiple-testing bias. Apply Bonferroni correction or use OOS pair
+    validation.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_pairs_johansen_v1
+  - chan_kalman_filter_pairs_v1
+  - chan_etf_pairs_ewa_ewc_v1
+prerequisites: None

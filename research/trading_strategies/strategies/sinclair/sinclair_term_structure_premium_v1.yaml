@@ -1,0 +1,140 @@
+strategy_id: sinclair_term_structure_premium_v1
+name: "IV Term Structure Premium Trade"
+author: Euan Sinclair
+
+source:
+  type: book
+  title: "Positional Option Trading: An Advanced Guide"
+  chapter_or_url: "Term structure chapter"
+  publication_year: 2020
+  page_or_section: "Term structure chapter"
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: implied_volatility_term_structure
+asset_class: [options]
+specific_instruments: "SPX/SPY (canonical); VIX futures; major equity options with sufficient option-chain term structure"
+timeframe: weekly
+holding_period_typical: "Weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Index options with rich term structure (multiple expirations); VIX futures complex"
+liquidity_filter: "Tight bid-ask across expirations"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Trade slope of the IV term structure based on VRP per maturity.
+
+    Method:
+    1. Compute IV at multiple maturities (e.g., 30d, 60d, 90d, 180d).
+    2. Compute IV slope: typically (IV_long - IV_short) / sqrt(time_diff).
+    3. Compare slope to historical distribution.
+
+    Key trades:
+    A) Curve normalisation:
+       When term structure is unusually inverted (short-dated IV > long-dated IV),
+       SHORT short-dated options (overpriced) and LONG long-dated options
+       (underpriced relative to term structure norm).
+
+    B) Calendar spread (short premium variant):
+       When implied term-structure slope is steeper than RV term-structure slope
+       (typically the case), short the over-priced front-month and long
+       under-priced back-month.
+
+    C) VIX futures basis:
+       When VIX < VX1 (front future) materially, buy VIX exposure (via VXX
+       or front-month VIX future). When inverted, short.
+
+    Sinclair's edge: short-dated options generally have HIGHER VRP than
+    long-dated, so calendar shorts (short front, long back) capture this
+    premium.
+  indicators_used:
+    - name: implied_volatility_term_structure
+      lookback_period: 1
+      formula_reference: "ATM IV at multiple expirations from option chain"
+      applied_to: "option chain"
+    - name: VIX_futures_basis
+      lookback_period: 1
+      formula_reference: "VX1 (front future) - VIX (spot)"
+      applied_to: "VIX complex"
+  entry_price: market_or_limit
+  entry_time: "Weekly evaluation; entry on signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: vega_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Vega-neutral on calendar; vega-target on directional bets"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "50% of credit OR term structure normalises"
+  stop_loss: "2× initial loss"
+  time_stop: "Closer-leg expiration"
+  trailing_stop: None
+  signal_reversal: "Close when slope reverses past entry level"
+  exit_priority: "Slope reversion → PT → time stop"
+  exit_price: market_or_limit
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "option chain at multiple expirations"
+    - "VIX futures complex"
+  data_frequency: daily
+  minimum_history_required: "5+ years"
+  benchmark: "CBOE PUT or VRP indices"
+  starting_capital: 100000
+  commission_assumption: "Per-contract × multiple legs"
+  slippage_assumption: "1-2 cents per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Demonstrated in book"
+  test_universe: "SPX, VIX complex"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author claims meaningful Sharpe contribution from term-structure trades"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Term-structure trades have the advantage of being less vol-spike sensitive than naked short premium because the long leg provides convexity hedge."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Diagonal spreads (different strikes + different expirations)"
+  - "VIX-futures-based term structure trades (no options)"
+  - "Skew-aware term-structure trades"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Slope normalisation by sqrt(time_diff) is one convention; some use
+    log(IV) per maturity.
+  - Multi-leg execution requires combo orders or careful sequential
+    fills.
+look_ahead_bias_warnings: "Standard EOD signal."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Many possible slope definitions; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - sinclair_variance_risk_premium_v1
+  - chan_volatility_term_structure_v1
+  - clenow_te_curve_trading_v1
+prerequisites: "Multi-leg options execution capability"

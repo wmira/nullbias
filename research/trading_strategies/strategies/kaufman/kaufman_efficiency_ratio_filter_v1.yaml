@@ -1,0 +1,120 @@
+strategy_id: kaufman_efficiency_ratio_filter_v1
+name: "Efficiency Ratio Regime Filter Overlay"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Smarter Trading"
+  chapter_or_url: "Efficiency Ratio chapter"
+  publication_year: 1995
+  page_or_section: "ER chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: regime_filter_overlay_efficiency_ratio
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying — used as overlay"
+timeframe: daily
+holding_period_typical: "N/A — overlay"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY: gate other strategies based on ER regime.
+
+    Compute ER over a rolling window (typically 10-20 days):
+      ER = abs(close[t] - close[t-N]) / sum(abs(close[k] - close[k-1]) for k=t-N+1..t)
+
+    Interpretation:
+      ER > 0.30  → trending regime  → enable trend-following strategies
+      ER < 0.10  → choppy regime   → enable mean-reversion strategies
+      0.10 ≤ ER ≤ 0.30 → mixed     → reduce position size
+
+    Application: gate any underlying strategy by computing ER on the
+    same instrument and only acting when ER is appropriate for the
+    strategy's bias.
+  indicators_used:
+    - name: efficiency_ratio
+      lookback_period: 10
+      formula_reference: "abs(close[t] - close[t-10]) / sum_abs_changes(10)"
+      applied_to: close
+  entry_price: per_underlying_strategy
+  entry_time: "Close-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Filter doesn't size; can scale per ER value"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "ER IS the regime filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "10-20 bars"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Various"
+  test_universe: "Stocks, futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Improves underlying strategy by avoiding wrong-regime trades"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Fewer (gating reduces frequency)"
+  notes: "Conceptually similar to chan_hurst_regime_filter_v1 but cheaper to compute and easier to interpret."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "ER over 21 days (longer regime view)"
+  - "ER > 0.50 for very-strong-trend filter"
+  - "Combined ER + Hurst exponent for double confirmation"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - ER thresholds 0.30 / 0.10 are heuristic; sweep robustness.
+  - Lookback 10 is Kaufman's published default.
+look_ahead_bias_warnings: "Causal computation."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "Threshold tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - kaufman_kama_trend_v1
+  - chan_hurst_regime_filter_v1
+  - chan_variance_ratio_filter_v1
+prerequisites: "Underlying strategy to overlay"

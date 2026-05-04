@@ -1,0 +1,149 @@
+strategy_id: carver_carry_v1
+name: "Carry Rule (Futures)"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Systematic Trading / Advanced Futures Trading Strategies"
+  chapter_or_url: "ST 2015 Appendix B; AFTS 2023 Strategies 10-12; qoppac.blogspot.com — extensive coverage; pysystemtrade GitHub `carry` rule"
+  publication_year: 2015
+  page_or_section: "Carry trading rule"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: futures_carry
+asset_class: [futures]
+specific_instruments: "Diversified futures contracts where carry is well-defined (term structure, dividends, financing). Especially: rates, FX, energy, metals."
+timeframe: daily
+holding_period_typical: "Months — very low turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures contracts with two simultaneous tradable expiries (front + next-back)"
+liquidity_filter: "Both relevant contract months must have adequate liquidity"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Instruments without continuous-contract carry data"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Continuous-forecast rule. At each daily close:
+
+    1. Identify front-month contract price P_front (nearest to expiry)
+    2. Identify next-month contract price P_next (next expiry after front)
+    3. Compute raw annualised carry:
+         carry_raw = (P_front - P_next) / P_front × (12 / months_to_next_expiry)
+       (sign convention: positive carry = front contract trades above next ⇒
+        contango is negative, backwardation positive — encourages long)
+    4. Compute price_vol = annualised stdev of daily price changes over 25 days
+    5. norm_carry = carry_raw / price_vol     # Sharpe-like ratio
+    6. Smooth norm_carry with EWMA span=N (Carver tests N=5, 20, 60, 120):
+         carry_smooth = EWMA(norm_carry, span=N)
+    7. forecast = carry_smooth × forecast_scalar
+       (forecast_scalar approximately 30 for the 60-day variant; values vary by speed)
+    8. capped_forecast = clip(forecast, -20, +20)
+
+    Position direction:
+      Long when forecast > 0 (positive carry / backwardation)
+      Short when forecast < 0 (negative carry / contango)
+
+    DEFAULT: 60-day smoothing speed (canonical Carver carry rule).
+  indicators_used:
+    - name: term_structure_carry
+      lookback_period: "1 month between contract expiries"
+      formula_reference: "(P_front - P_next) / P_front × (12 / months_between)"
+      applied_to: "futures prices (front and next)"
+    - name: stdev
+      lookback_period: 25
+      formula_reference: "Stdev of daily price diffs annualised by sqrt(252)"
+      applied_to: "price differences"
+    - name: EWMA
+      lookback_period: 60
+      formula_reference: "EWMA span=60 of normalised carry"
+      applied_to: "norm_carry series"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: "~30 for span=60 smoothing (instrument-empirical)"
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments with valid carry signal"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "IDM"
+  sector_concentration_limits: "FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "60 bars (smoothing) + 25 bars vol"
+  benchmark: "BTOP50 / Carver diversified system"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years through 2023"
+  test_universe: "Diversified futures with valid term structure"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author claims standalone Sharpe ~0.4–0.5 on diversified set; comparable to EWMAC and lowly correlated"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Carry has 'opposite skew' to trend: positive carry trades work most
+    of the time but suffer occasional sharp losses. Combining trend +
+    carry diversifies the skew exposure.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Faster smoothing: span=5 or 20 (more turnover, lower Sharpe)"
+  - "Slower smoothing: span=120 (higher Sharpe, even less turnover)"
+  - "Use spot vs front-month for non-rolling instruments"
+  - "Equity index carry: dividend yield - financing cost"
+  - "FX carry: interest rate differential"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Sign convention: backwardation produces positive carry forecast.
+    Some implementations invert; document choice.
+  - Annualisation factor: (12 / months_between) is standard for monthly
+    futures; quarterly contracts use (4 / quarters_between) etc.
+  - Multiple smoothing speeds (5, 20, 60, 120 day) are documented as
+    separate variants in the AFTS book; default 60 chosen here as the
+    standalone canonical version.
+look_ahead_bias_warnings: "Carry computed on close prices known by EOD; standard for end-of-day execution."
+survivorship_bias_warnings: "Negligible (futures with proper roll handling)."
+data_snooping_warnings: "Forecast scalars are calibrated empirically per instrument."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_16_64_v1
+  - carver_skew_v1
+  - carver_assettrend_v1
+  - carver_relmomentum_v1
+prerequisites: "Volatility-target overlay (carver_vol_target_overlay_v1); requires multi-contract futures data feed"

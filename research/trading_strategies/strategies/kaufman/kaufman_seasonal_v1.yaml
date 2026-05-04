@@ -1,0 +1,126 @@
+strategy_id: kaufman_seasonal_v1
+name: "Kaufman Seasonal Patterns (Multi-Year Average)"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Trading Systems and Methods"
+  chapter_or_url: "Seasonality chapter"
+  publication_year: 1987
+  page_or_section: "Seasonality chapters across editions"
+
+# === STRATEGY METADATA ===
+category: seasonal
+sub_category: cross_year_calendar_seasonal
+asset_class: [futures, equities, etfs]
+specific_instruments: "Commodities (ag, energy), seasonal stocks, holiday-effect ETFs"
+timeframe: daily
+holding_period_typical: "Weeks within seasonal window"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Instruments with documented multi-year seasonal patterns"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Seasonal pattern detection:
+    1. For each calendar day-of-year (or week-of-year), compute the
+       average return over the prior N years (N ≥ 10):
+         avg_return[doy] = mean of returns on this day-of-year over last 10 years
+    2. Identify reliable patterns: days/weeks where avg_return is
+       consistently positive (or negative) across years AND statistically
+       significant (t-test p < 0.05).
+    3. Trade rule: enter LONG at the start of a positive-pattern window,
+       SHORT at start of negative-pattern window. Exit at the documented
+       end of the pattern.
+
+    Refinement: only trade when the CURRENT year's prior-period
+    behaviour aligns with the historical pattern (avoid trading
+    when current year is structurally different).
+  indicators_used:
+    - name: rolling_seasonal_mean
+      lookback_period: "10+ prior years"
+      formula_reference: "For each calendar position, average the return on that position across prior years"
+      applied_to: returns
+    - name: t_test_seasonality
+      lookback_period: "10+ prior years"
+      formula_reference: "Two-sample t-test of seasonal-window returns vs full-year baseline"
+      applied_to: returns
+  entry_price: market_at_close
+  entry_time: "Calendar-driven (first trading day of seasonal window)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Optional: scale by historical Sharpe of the seasonal window"
+  max_concurrent_positions: "Multiple seasonal trades simultaneously"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: NOT_SPECIFIED
+  stop_loss: "2 × ATR(20)"
+  time_stop: "End of seasonal window"
+  trailing_stop: NOT_SPECIFIED
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Time stop dominant"
+  exit_price: market_at_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Multiple seasonal trades may correlate (e.g., winter heating demand for NG and HO); diversify"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "10+ years per instrument"
+  benchmark: "Buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Commodities, stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Patterns can break with structural changes (e.g., shale gas changed natural gas seasonality post-2010). Stability check essential."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use median instead of mean for outlier robustness"
+  - "Spread trades within same commodity (long peak season, short off-season)"
+  - "Combine with momentum confirmation"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Calendar day-of-year vs trading-day-of-year is a choice; trading-day
+    is more useful for futures with non-continuous calendar.
+  - Multi-year mean has selection bias if only 'good' historical
+    patterns are kept. Test all calendar positions, not just curated ones.
+look_ahead_bias_warnings: "Use prior-only data to compute pattern; validate OOS."
+survivorship_bias_warnings: "Material on commodity universes."
+data_snooping_warnings: "Significant — many calendar positions tested implicitly. Apply Bonferroni or holdout."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_seasonal_futures_v1
+  - carver_carry_v1
+prerequisites: None

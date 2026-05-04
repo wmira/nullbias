@@ -1,0 +1,125 @@
+strategy_id: longmore_etf_rotation_zorro_v1
+name: "ETF Rotation in Zorro (Robot Wealth Style)"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "ETF Rotation Strategies in Zorro"
+  chapter_or_url: "robotwealth.com/etf-rotation-strategies-in-zorro/"
+  publication_year: 2018
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: monthly_etf_rotation_with_third_day_rebalance
+asset_class: [etfs]
+specific_instruments: "Sector ETFs, country ETFs, factor ETFs"
+timeframe: monthly
+holding_period_typical: "1 month"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified ETF basket — sectors, countries, factor ETFs"
+liquidity_filter: "ETF AUM > $500M"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Monthly rotation with deliberate avoidance of month-end / month-start
+    flow distortion:
+
+    1. On the 3rd trading day of each month at the close:
+       Compute 6-month total return for each ETF.
+    2. Apply absolute-momentum filter: keep only ETFs with return > 0.
+    3. Rank passing ETFs by 6m return descending.
+    4. Buy top-3 ETFs equal-weighted.
+    5. Hold until next month's 3rd trading day.
+
+    Note: third-trading-day timing avoids the heavy turn-of-month flow
+    that distorts returns at month boundaries (Robot Wealth's
+    intentional choice).
+  indicators_used:
+    - name: ROC
+      lookback_period: 126
+      formula_reference: "(close[t] / close[t-126]) - 1"
+      applied_to: close
+    - name: trading_day_of_month
+      lookback_period: 1
+      formula_reference: "Day count from start of month"
+      applied_to: "calendar"
+  entry_price: close_signal_bar
+  entry_time: "Close of 3rd trading day each month"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 33.33  # 1/3 if all 3 slots filled
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 3
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Next month's 3rd trading day"
+  trailing_stop: None
+  signal_reversal: "Per-month re-rank"
+  exit_priority: "Time stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Absolute-momentum filter (return > 0) acts as per-asset gate"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "126 bars per ETF"
+  benchmark: "Equal-weight ETF basket"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in Zorro article"
+  test_universe: "Sector / country ETFs"
+  cagr: "Comparable to Alvarez/Gray equivalent strategies"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Robot Wealth's contribution is the third-trading-day rebalance timing — empirically slightly better than EOM rebalance per their tests."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "1st or 2nd trading day instead of 3rd"
+  - "Top 1 / Top 5 instead of Top 3"
+  - "Different lookback (3m, 9m, 12m)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Third trading day' counted from month start using exchange calendar.
+  - Robot Wealth specifies: avoid month boundaries because flows
+    distort momentum signal.
+look_ahead_bias_warnings: "EOD signal, EOD fill or next-day open."
+survivorship_bias_warnings: "Negligible (major ETFs)."
+data_snooping_warnings: "Lookback and top-N tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_country_etf_rotation_v1
+  - alvarez_three_factor_etf_rotation_v1
+  - clenow_te_global_macro_momentum_v1
+prerequisites: None

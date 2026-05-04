@@ -1,0 +1,136 @@
+strategy_id: chan_hurst_regime_filter_v1
+name: "Hurst Exponent Regime Detection (Mean Rev vs Trend)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Mean reversion testing chapter; epchan.blogspot.com posts"
+  publication_year: 2013
+  page_or_section: "Mean reversion / regime detection chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: regime_filter_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any series — used as REGIME OVERLAY to gate other strategies"
+timeframe: daily
+holding_period_typical: "N/A — overlay"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by the underlying strategy this filter overlays"
+liquidity_filter: "Per underlying strategy"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY rule — gates other strategies based on whether the series is
+    in a mean-reverting or trending regime.
+
+    Compute Hurst exponent H over a rolling window (typically 100-365 days):
+
+    Method (rescaled-range R/S analysis):
+    1. For a series x of length N, divide into chunks of varying sizes τ
+    2. For each τ, compute mean of partial sums and the rescaled range:
+         R(τ) = max(cumsum(x - mean)) - min(cumsum(x - mean))
+         S(τ) = stdev(x)
+         R/S(τ) = R(τ) / S(τ)
+    3. Average R/S across chunks of size τ
+    4. Fit log(avg R/S) vs log(τ): slope = H
+
+    Interpretation:
+      H < 0.5  → mean-reverting regime  → enable mean-reversion strategies
+      H = 0.5  → random walk           → no edge; reduce or disable trading
+      H > 0.5  → trending regime        → enable trend strategies
+
+    Application as overlay:
+      For each underlying, on each daily bar:
+        rolling_H = compute Hurst over last 252 bars
+        if rolling_H < 0.45: allow mean-reversion entries (e.g., chan_bollinger_meanrev_v1)
+        if rolling_H > 0.55: allow trend-following entries
+        else: hold cash or maintain neutral
+  indicators_used:
+    - name: Hurst_exponent
+      lookback_period: 252
+      formula_reference: "Rescaled-range R/S analysis. Implementations: nolds.hurst_rs, hurst.compute_Hc, custom R/S code"
+      applied_to: "log returns or prices"
+  entry_price: per_underlying_strategy
+  entry_time: "Close-of-day evaluation"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Hurst regime filter doesn't directly size positions; gates entry signals"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: "Regime flip can disable currently-active strategy"
+  exit_priority: "Per underlying"
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "This IS the regime filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars for stable H estimate"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple windows in Chan's analyses"
+  test_universe: "Various series"
+  cagr: NOT_SPECIFIED
+  sharpe: "As an overlay, improves underlying strategy Sharpe by avoiding wrong-regime trades"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Reduced (gating reduces trade frequency)"
+  notes: "Hurst exponent is noisy on shorter windows; 252+ bars recommended. Statistical significance via variance-ratio test (see chan_variance_ratio_filter_v1)."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Generalised Hurst exponent (handles non-stationary series)"
+  - "Detrended Fluctuation Analysis (DFA) variant"
+  - "Multi-scale Hurst (different time horizons)"
+  - "Combine with ADF p-value for stronger regime confidence"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - R/S analysis is the canonical Chan method but has known small-sample
+    bias. Detrended Fluctuation Analysis (DFA) is more robust.
+  - Threshold 0.5 ± 0.05 is a heuristic buffer; tighter buffers produce
+    more frequent regime flips.
+  - On very short windows (<100 bars) Hurst estimates are unreliable.
+look_ahead_bias_warnings: "Use rolling H computed only from past data."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "Threshold and window choices are tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - chan_variance_ratio_filter_v1
+  - chan_bollinger_meanrev_v1
+  - chan_pairs_engle_granger_v1
+prerequisites: "Underlying strategy to overlay"

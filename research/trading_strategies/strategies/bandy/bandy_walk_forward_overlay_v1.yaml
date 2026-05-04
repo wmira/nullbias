@@ -1,0 +1,138 @@
+strategy_id: bandy_walk_forward_overlay_v1
+name: "Walk-Forward Optimization Methodology Overlay"
+author: Howard Bandy
+
+source:
+  type: book
+  title: "Quantitative Trading Systems / Modeling Trading System Performance"
+  chapter_or_url: "Walk-forward chapters"
+  publication_year: 2007
+  page_or_section: "Walk-forward chapters across both books"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: validation_methodology_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying strategy with tunable parameters"
+timeframe: daily
+holding_period_typical: "N/A — methodology"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by the underlying strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY METHODOLOGY — applied to any parameterised strategy.
+
+    1. Define strategy parameters (e.g., RSI threshold, lookback windows,
+       exit conditions).
+    2. Define optimization criterion (typically Sharpe ratio or
+       expectancy).
+    3. Walk-forward window structure:
+         in_sample_length:  N years (typically 3-5)
+         out_of_sample_length: M years (typically 1)
+         step_size: M (advance by OOS length each iteration)
+    4. For each window:
+         a. Optimize parameters on the IS window
+         b. Trade with optimal parameters on the OOS window
+         c. Record OOS performance
+    5. Concatenate OOS performance across all windows.
+
+    The strategy is considered VIABLE only if OOS performance is
+    materially positive — Bandy's threshold is OOS Sharpe > 0.7.
+
+    WFE (Walk-Forward Efficiency) ratio:
+      WFE = OOS_Sharpe / IS_Sharpe
+    Bandy's heuristic: WFE > 0.5 indicates the optimization isn't
+    over-fit; lower WFE means in-sample tuning doesn't generalize.
+  indicators_used:
+    - name: walk_forward_optimizer
+      lookback_period: "Configurable"
+      formula_reference: |
+        Standard walk-forward CV: split history into N IS/OOS windows,
+        optimize on each IS, evaluate on each OOS, concatenate OOS results.
+        scikit-learn TimeSeriesSplit provides comparable functionality.
+      applied_to: "any parameter-search strategy"
+  entry_price: per_underlying_strategy
+  entry_time: per_underlying_strategy
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Walk-forward output produces a parameter set, not a position size"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: "Per underlying"
+  data_frequency: daily
+  minimum_history_required: "Several years (e.g., 10+ for 5IS/1OOS structure)"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Methodology, not strategy"
+  test_universe: "Demonstrated on multiple strategies in his books"
+  cagr: NOT_SPECIFIED
+  sharpe: "Bandy's threshold: OOS Sharpe > 0.7 to consider system viable"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Walk-forward + Monte Carlo + system-health monitoring is Bandy's signature methodology framework. Adopted broadly in retail systematic trading literature."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Anchored walk-forward (always use all prior history)"
+  - "Sliding walk-forward (fixed-length IS window)"
+  - "Multi-objective optimization (Sharpe + drawdown constraint)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - IS/OOS lengths and step sizes are choices; sliding 5-year IS / 1-year
+    OOS / 1-year step is the canonical Bandy default.
+  - Walk-forward overlay is a META method — apply to any other
+    strategy in the index.
+look_ahead_bias_warnings: "WFO is specifically designed to eliminate look-ahead — but only if implemented strictly (no peeking at OOS during IS optimization)."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: |
+  - Walk-forward DOES reduce look-ahead bias but does NOT eliminate
+    multiple-testing bias when many parameter combinations are tested.
+  - Final OOS Sharpe is itself subject to selection bias if many
+    strategies are walk-forwarded and only the best is kept.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_monte_carlo_validation_v1
+  - bandy_health_check_overlay_v1
+prerequisites: "Underlying parameterised strategy"

@@ -1,0 +1,138 @@
+strategy_id: raschke_3_10_oscillator_v1
+name: "3-10 Oscillator First Cross"
+author: Linda Raschke
+
+source:
+  type: blog_post
+  title: "3-10 Oscillator (LBR's signature indicator)"
+  chapter_or_url: "lindaraschke.net 'Terminology and Setups' page; LBR Group educational videos"
+  publication_year: 1981
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: macd_style_oscillator_first_cross
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid trending instruments"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid daily instruments"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Indicator construction:
+    - oscillator = SMA(close, 3) - SMA(close, 10)
+    - signal_line = SMA(oscillator, 16)
+
+    Note: 3-10 uses SIMPLE moving averages, distinguishing it from
+    standard MACD which uses EMAs.
+
+    LONG entry — 'first cross' setup:
+    1. signal_line crosses ABOVE zero (intermediate trend just turned up)
+    2. oscillator crosses ABOVE signal_line, then HOOKS back down briefly
+    3. oscillator hooks back UP through signal_line again
+    4. Buy at the close of the bar where the second up-cross happens, OR
+       enter on stop above the signal bar's high.
+
+    SHORT entry — symmetric:
+    1. signal_line crosses BELOW zero (intermediate trend turned down)
+    2. oscillator crosses BELOW signal_line, hooks up briefly, then back
+       down
+
+    Conceptually identical to The Anti pattern but using Raschke's
+    proprietary oscillator instead of stochastic.
+  indicators_used:
+    - name: SMA
+      lookback_period: 3
+      formula_reference: "Simple 3-period MA of close"
+      applied_to: close
+    - name: SMA
+      lookback_period: 10
+      formula_reference: "Simple 10-period MA of close"
+      applied_to: close
+    - name: SMA_of_oscillator
+      lookback_period: 16
+      formula_reference: "Simple 16-period MA of (SMA3 - SMA10)"
+      applied_to: "oscillator series"
+  entry_price: market_at_close_or_stop
+  entry_time: "End-of-bar fill at close, OR stop entry next bar"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "1% risk / stop distance"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Recent swing high / swing low"
+  stop_loss: "Below the pullback low (long) / above pullback high (short)"
+  time_stop: "5-bar time stop"
+  trailing_stop: "Optional: trail behind the oscillator zero line"
+  signal_reversal: "Exit when oscillator crosses signal line in opposite direction"
+  exit_priority: "Stop → reversal cross → time stop → target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Signal_line above/below zero acts as regime"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "26 bars (16 + 10) for indicator stabilisation"
+  benchmark: "Buy-and-hold underlying"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Used by Raschke since 1981"
+  test_universe: "Stocks, futures"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Raschke describes the 3-10 as a 'three-in-one' indicator (momentum, swing, trend). Most signals come from the first cross — subsequent crosses have lower edge per her teaching."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use EMA instead of SMA (becomes standard MACD)"
+  - "Different periods (5-15, 5-20)"
+  - "Combine with chart patterns for confirmation"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - SMA construction is what differentiates 3-10 from MACD; user must
+    NOT substitute EMAs.
+  - 'First cross' is mechanical: track signal-line zero-crossings and
+    only trade the oscillator's first cross-back-through-signal after
+    each zero-cross.
+look_ahead_bias_warnings: "Same-day close fills assumed; live execution requires either MOC orders or T+1 entry."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "Periods fixed by author (3, 10, 16); not heavily tuned."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_anti_v1
+  - raschke_holy_grail_v1
+prerequisites: None

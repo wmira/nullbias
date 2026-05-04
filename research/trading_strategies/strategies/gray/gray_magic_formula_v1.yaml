@@ -1,0 +1,141 @@
+strategy_id: gray_magic_formula_v1
+name: "Magic Formula (Greenblatt Baseline as Tested in QV)"
+author: Wesley Gray (Alpha Architect; per Greenblatt's original)
+
+source:
+  type: book
+  title: "Quantitative Value (Chapter on Magic Formula testing)"
+  chapter_or_url: "QV book Magic Formula chapter; alphaarchitect.com posts"
+  publication_year: 2012
+  page_or_section: "Magic Formula chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: cheapness_quality_combination
+asset_class: [equities]
+specific_instruments: "US large- and mid-cap stocks"
+timeframe: monthly
+holding_period_typical: "12 months"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - Listed on NYSE/AMEX/NASDAQ
+  - Market cap above 40th percentile of NYSE breakpoint
+  - Excludes financials and utilities
+liquidity_filter: "Mid-cap or larger"
+fundamental_filter: "Excludes financials and utilities"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Annual screening process per Greenblatt's *The Little Book That Beats
+    the Market*:
+
+    1. Compute two metrics for each stock:
+         a. Earnings Yield: EBIT / Enterprise Value
+            (cheapness)
+         b. Return on Capital: EBIT / (Net Fixed Assets + Working Capital)
+            (quality / earnings power)
+    2. Rank universe by each metric independently (1 = best)
+    3. Combined rank = rank_earnings_yield + rank_return_on_capital
+    4. Select top 30 stocks by combined rank (lowest sum)
+    5. Equal-weight allocation
+    6. Hold for 12 months, then re-rank
+
+    Greenblatt's original proposal: 5-7 stocks bought every 2-3 months,
+    holding 30 names total; this YAML codifies the more common
+    implementation of 30 names rebalanced once per year.
+  indicators_used:
+    - name: EBIT_EV
+      lookback_period: "TTM"
+      formula_reference: "trailing_12mo_EBIT / (market_cap + total_debt - cash)"
+      applied_to: "fundamentals"
+    - name: ROC_capital
+      lookback_period: "Latest fiscal period"
+      formula_reference: "trailing_12mo_EBIT / (net_fixed_assets + working_capital)"
+      applied_to: "fundamentals"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open (annual rebalance)"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 3.33  # 1/30
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 30
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "12-month hold then re-rank"
+  trailing_stop: None
+  signal_reversal: "Annual re-rank"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Optional sector cap"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "fundamentals (income statement, balance sheet)"
+    - "daily prices and returns"
+  data_frequency: "Quarterly fundamentals; daily prices"
+  minimum_history_required: "1 year of fundamentals"
+  benchmark: "S&P 500 / Russell 1000 Value"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Greenblatt's original tests 1988-2004; Gray's QV book retest 1964-2011"
+  test_universe: "US large+mid cap"
+  cagr: "Greenblatt: ~30% annualised in original test. Gray's retest: ~13-14% — substantial gap to Greenblatt's claim explained by data and survivorship issues."
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Gray's QV book demonstrates that Magic Formula's edge derives almost
+    entirely from the cheapness leg (EBIT/EV); the quality leg adds
+    little. This motivated the QV book's recommendation of pure
+    EBIT/EV ranking (see gray_ebit_ev_value_v1).
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Greenblatt's original: 5 stocks per 2-3 months, holding 30; this YAML uses single annual rebalance for 30"
+  - "Top 50 instead of 30"
+  - "Drop ROC leg → becomes gray_ebit_ev_value_v1"
+  - "Add forensic / quality screens → becomes gray_quant_value_v1"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Greenblatt's exact 'magicformulainvesting.com' implementation excludes
+    foreign ADRs and uses additional refinements; this YAML codifies the
+    pure 2-factor version.
+  - Sector exclusions (financials, utilities) follow QV book convention.
+look_ahead_bias_warnings: "Use lagged fundamentals (3-month delay)."
+survivorship_bias_warnings: "Material — much of Greenblatt's reported alpha may have been survivorship-bias-inflated."
+data_snooping_warnings: "Test period sensitivity is high."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_quant_value_v1
+  - gray_ebit_ev_value_v1
+  - gray_qval_etf_v1
+prerequisites: None

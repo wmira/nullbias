@@ -1,0 +1,138 @@
+strategy_id: carver_fast_meanrev_v1
+name: "Fast Mean Reversion (Vol-Normalised Z-Score Reversal)"
+author: Robert Carver
+
+source:
+  type: book
+  title: "Advanced Futures Trading Strategies"
+  chapter_or_url: "AFTS Strategy 27 (Fast Mean Reversion)"
+  publication_year: 2023
+  page_or_section: "Strategy 27 chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: vol_normalised_z_score
+asset_class: [futures]
+specific_instruments: "Liquid futures contracts where intraday/short-term mean reversion is plausible (rates, FX, equity index)"
+timeframe: daily
+holding_period_typical: "1–3 days; high turnover"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures with low transaction costs (mean reversion is cost-sensitive)"
+liquidity_filter: "Tight cost filter — only the cheapest instruments are economic"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Instruments with persistent trend behaviour (e.g., long bonds in QE era) where this rule consistently loses money"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Fast cross-over of price relative to its short-term equilibrium.
+
+    1. Equilibrium estimate: equil = EWMA(price, span=10)
+    2. Deviation = price[t] - equil[t]
+    3. Vol normalisation: norm_dev = deviation / price_vol_25d
+    4. Sign-flipped to invert (mean reversion bets AGAINST momentum):
+         signal = -norm_dev
+    5. Smooth: smoothed_signal = EWMA(signal, span=4)
+    6. forecast = smoothed_signal × forecast_scalar
+       forecast_scalar (fast mean reversion) empirically ≈ 50
+    7. capped_forecast = clip(forecast, -20, +20)
+
+    Long when price is below short-term equilibrium and signal is positive.
+    Short when price is above equilibrium and signal is negative.
+  indicators_used:
+    - name: EWMA
+      lookback_period: 10
+      formula_reference: "ewm(span=10)"
+      applied_to: close
+    - name: stdev
+      lookback_period: 25
+      formula_reference: "Stdev of daily price diffs"
+      applied_to: "price differences"
+    - name: EWMA
+      lookback_period: 4
+      formula_reference: "ewm(span=4)"
+      applied_to: "negative-of-normalised-deviation series"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: 50.0
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "Cost-eligible instruments only"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous; reverses at equilibrium"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Negatively correlated with EWMAC family — natural hedge"
+  sector_concentration_limits: "FDM"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "25 bars vol + 10 bars EWMA + 4 bars smoothing"
+  benchmark: "Carver diversified system"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract — mean reversion's edge is cost-sensitive"
+  slippage_assumption: "1 spread per round trip"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "~50 years through 2023"
+  test_universe: "Cost-eligible diversified futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone modest after costs; primary value is diversification (negative correlation with trend)"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Very high — turnover ~50× per year per instrument"
+  notes: |
+    Carver flags this as a 'second-tier' rule: economically justifiable
+    only because its negative correlation with trend rules produces a
+    portfolio Sharpe lift, not because of standalone returns.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Slower equilibrium (span=20 or 40)"
+  - "Use return mean instead of EWMA equilibrium"
+  - "Bollinger-band-style: only act when |z| > 2"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'Equilibrium' = EWMA span 10 is Carver's published default; some
+    posts test span=20.
+  - Sign convention: signal = -norm_dev so positive forecast = long.
+    Easy to invert by accident.
+  - Cost-eligibility filter is critical — without it, the rule loses
+    money on high-cost instruments.
+look_ahead_bias_warnings: "Same as EWMAC family."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "Mean-reversion's economic viability depends on transaction-cost assumptions; backtest with realistic slippage."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_2_8_v1
+  - carver_ewmac_16_64_v1
+  - connors_rsi2_v1
+prerequisites: "Volatility-target overlay; transaction-cost filter for instrument selection"

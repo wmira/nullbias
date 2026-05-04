@@ -1,0 +1,135 @@
+strategy_id: alvarez_rsi2_rule_change_v1
+name: "RSI(2) Strategy with Rule Change That Doubled Returns"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "RSI2 Strategy: Double returns with a simple rule change"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/rsi2-strategy-double-returns-with-a-simple-rule-change/"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: oversold_pullback
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks (per-name application)"
+timeframe: daily
+holding_period_typical: "2–5 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - S&P 500 membership (point-in-time)
+  - close > $5
+  - 21-day average dollar volume > $10M
+  - close > SMA(close, 200)   (per-stock filter)
+liquidity_filter: "21-day avg(close*volume) > $10M"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Canonical rule (from Connors): close > SMA(200) AND RSI(2) < 5 → buy at close.
+
+    Alvarez's "rule change":
+    Add the constraint that today is at least the 2nd consecutive day RSI(2) < 5.
+    i.e., RSI(close, 2)[t] < 5 AND RSI(close, 2)[t-1] < 5.
+
+    Place a limit order at close * (1 - 0.04) for the NEXT day.
+    If filled, hold per exit rule. If not filled, cancel order at close of day t+1.
+
+    All conditions to enter:
+    1. close(t) > SMA(close, 200)[t]
+    2. RSI(close, 2)[t] < 5
+    3. RSI(close, 2)[t-1] < 5
+    4. Place limit buy at close(t) * 0.96 GTC for day t+1 only
+    5. Fill executes if intraday low(t+1) ≤ limit price
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: "Limit order at 0.96 * close(t) executed on day t+1"
+  entry_time: "Intraday on day t+1 if low(t+1) <= limit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit at next open after RSI(2) > 70"
+  stop_loss: None
+  time_stop: "Exit at open after 8 bars in trade if no exit signal"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Profit target first; then time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-stock 200-SMA filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 30 bars RSI warmup"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "0 bps if limit fills only"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2017 in original post"
+  test_universe: "S&P 500"
+  cagr: "Author reports approximately 2x the canonical Connors RSI(2) returns"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Higher than canonical RSI(2)"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Lower than canonical due to limit order requirement"
+  notes: "Improvement comes from (a) two-day RSI persistence and (b) limit order requiring further intraday weakness."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Limit order at 0.95 or 0.97 of close (different aggression)"
+  - "Drop two-day persistence requirement (closer to Connors)"
+  - "Apply to Russell 3000 with looser dollar-volume filter"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Limit order distance of 4% is a common Alvarez parameter from his
+    multiple posts on entry timing; he often tests 3% and 5% as well.
+  - Limit order is GTC for day t+1 only — must be cancelled if not filled
+    intraday.
+  - Author's 8-day time stop is a common default across his mean reversion
+    posts; assumed here unless original post overrode it.
+look_ahead_bias_warnings: "None when using close(t) for limit price and intraday fill on t+1."
+survivorship_bias_warnings: "Material — use point-in-time S&P 500 membership."
+data_snooping_warnings: "Limit-distance, RSI threshold, and time-stop bars all heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - alvarez_meanrev_entry_timing_v1
+  - alvarez_simple_meanrev_v1
+prerequisites: None

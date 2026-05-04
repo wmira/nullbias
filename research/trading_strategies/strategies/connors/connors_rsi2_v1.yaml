@@ -1,0 +1,141 @@
+# =============================================================================
+# Connors RSI(2) — long-only ETF / index mean reversion
+# =============================================================================
+
+strategy_id: connors_rsi2_v1
+name: "RSI(2) Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "Short Term Trading Strategies That Work"
+  chapter_or_url: "Discussed throughout; co-authored with Cesar Alvarez"
+  publication_year: 2008
+  page_or_section: "Multiple chapters; the indicator is also covered in 'How Markets Really Work' (2004)"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: oversold_pullback
+asset_class: [equities, etfs]
+specific_instruments: "Originally tested on SPY and broad-market ETFs; widely applied to liquid ETFs and large-cap stocks"
+timeframe: daily
+holding_period_typical: "2–6 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Liquid equity index ETFs (SPY, QQQ, IWM, DIA) or stocks with sufficient
+  liquidity. Connors' canonical demonstration uses SPY.
+liquidity_filter: "20-day average dollar volume ≥ $20M (default; not author-specified for ETF demo)"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "None author-specified. Standard practice: exclude stocks under $5 if applied to single names."
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t                    # primary uptrend filter
+    2. RSI(close, 2) at bar t is < 5                           # deeply oversold
+    3. No position currently open in this instrument
+    Note: Connors also publishes a less-strict variant using RSI(2) < 10,
+    documented under `variations`.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing (standard RSI definition; same as Wilder 1978)"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of signal bar; in live trading use market-on-close order or next-day open with documented slippage"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100   # Connors' canonical demo runs an all-in single-instrument allocation
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1   # single-instrument canonical version; multi-ETF portfolio version uses up to N
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when close(t) > SMA(close, 5) at bar t"
+  stop_loss: "None — Connors explicitly states stops degraded performance in his testing"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single exit rule; not applicable"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Embedded in entry rule (close > 200-SMA)"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars to seed the SMA(200)"
+  benchmark: "SPY (buy and hold)"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail) or $0.005/share author-era"
+  slippage_assumption: "0 bps if using close fills with limit; 5–10 bps for market-on-close in liquid ETFs"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1995–2008 (book era); subsequent literature has tested through 2024"
+  test_universe: "SPY and selected ETFs"
+  cagr: "Variable by version; mid-single-digit to low-double-digit on SPY when only invested during signals"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "≈ 70–80% in author's data window"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Performance has degraded materially in some 2015–2020 sub-periods per third-party tests; document but not author's claim."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "RSI(2) < 10 instead of < 5 — wider, more frequent entries"
+  - "Aggressive scale-in: enter on RSI(2)<10, double on RSI(2)<5"
+  - "Exit on RSI(2) > 70 instead of close > 5-SMA"
+  - "Short side: close < 200-SMA AND RSI(2) > 95 → short; cover when close < 5-SMA"
+  - "Cumulative RSI variant: see connors_cumulative_rsi_v1"
+  - "Apply to leveraged ETFs (SSO, TQQQ) with no parameter change — produces higher volatility version"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author describes RSI as standard 14-period RSI shrunk to period 2; assumed
+    Wilder smoothing per the canonical RSI definition.
+  - "Close > 200-SMA" is checked at the same bar as the signal; no warmup
+    ambiguity but note that on day t the signal uses close(t), so live
+    execution requires market-on-close orders or T+1 entry with carry.
+  - Connors does not define a portfolio-level allocation; multi-instrument
+    versions in derivative literature typically use equal-dollar with a
+    cap on concurrent positions.
+look_ahead_bias_warnings: |
+  - Signal is computed FROM close(t) and assumed filled AT close(t). Naïve
+    backtests sometimes use today's close for both indicator and fill —
+    acceptable for research, but live execution must reconcile to MOC fill
+    or T+1 open with simulated slippage.
+survivorship_bias_warnings: "Negligible if applied to ETFs. Material if applied to a survivorship-prone single-stock universe."
+data_snooping_warnings: |
+  - The thresholds (5, 10, 200) are widely-used round numbers but were
+    derived from extensive in-sample testing in the book era. Out-of-sample
+    robustness has degraded since publication. Consider parameter
+    sensitivity in walk-forward tests.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_cumulative_rsi_v1
+  - connors_rsi25_75_v1
+  - connors_r3_v1
+  - connors_crsi_pullback_v1
+prerequisites: None

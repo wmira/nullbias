@@ -1,0 +1,139 @@
+strategy_id: kaufman_kama_trend_v1
+name: "KAMA Trend Following (Kaufman Adaptive Moving Average)"
+author: Perry Kaufman
+
+source:
+  type: book
+  title: "Smarter Trading: Improving Performance in Changing Markets"
+  chapter_or_url: "KAMA chapter; Trading Systems and Methods (multiple editions) cross-references"
+  publication_year: 1995
+  page_or_section: "KAMA / Efficiency Ratio chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: adaptive_moving_average_slope
+asset_class: [equities, etfs, futures]
+specific_instruments: "Liquid trending instruments"
+timeframe: daily
+holding_period_typical: "Weeks to months"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Any liquid daily-bar instrument"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    KAMA construction (Kaufman's recommended parameters: 10, 2, 30):
+
+    1. Efficiency Ratio (ER):
+         direction = abs(close[t] - close[t-10])
+         volatility = sum of abs(close[k] - close[k-1]) for k in t-9..t
+         ER = direction / volatility   (range 0 to 1)
+
+    2. Smoothing Constant (SC):
+         fastest_SC = 2 / (2 + 1)   = 2/3 = 0.6667
+         slowest_SC = 2 / (30 + 1) = 2/31 ≈ 0.0645
+         SC[t] = (ER[t] × (fastest_SC - slowest_SC) + slowest_SC)^2
+
+    3. KAMA recursion:
+         KAMA[t] = KAMA[t-1] + SC[t] × (close[t] - KAMA[t-1])
+         Initial KAMA = SMA(close, 10)
+
+    Trade rules — slope-based:
+       LONG when KAMA[t] > KAMA[t-N] (N=1 default; 5 for less noise)
+       SHORT when KAMA[t] < KAMA[t-N]
+       Flat when KAMA is sideways (|KAMA[t] - KAMA[t-N]| < threshold)
+
+    Optional ER gate:
+       Only act when ER > 0.30 (trending environment).
+       In choppy environments (ER low), KAMA flattens and signal is
+       muted — but the strategy generates fewer trades in those
+       periods, which is the point.
+  indicators_used:
+    - name: KAMA
+      lookback_period: "(10, 2, 30)"
+      formula_reference: "Kaufman Adaptive Moving Average. Implementation: TA-Lib has KAMA; pandas-ta.kama; or hand-rolled per formula above."
+      applied_to: close
+    - name: efficiency_ratio
+      lookback_period: 10
+      formula_reference: "ER = abs(close[t] - close[t-10]) / sum_of_abs_price_changes(10)"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity_or_atr
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: 2
+  scaling_rules: "Position = (equity × 1%) / (2 × ATR(20))"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "2 × ATR(20) from entry"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: "Trail behind KAMA"
+  signal_reversal: "Exit when KAMA slope changes sign"
+  exit_priority: "Stop → KAMA reversal → trailing"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into ER (low ER = no trade)"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "30 bars"
+  benchmark: "Underlying buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995 in original; updated in subsequent editions"
+  test_universe: "Stocks and futures"
+  cagr: NOT_SPECIFIED
+  sharpe: "Author claims KAMA outperforms simple/exponential MAs in choppy markets"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Lower than simple MA crosses due to ER-modulated smoothing"
+  notes: "KAMA's edge is in CHOPPY markets — its smoothing reduces whipsaws when ER is low. In strong trends KAMA matches simple MAs."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different ER lookback (5, 14, 21)"
+  - "KAMA(10,5,30) faster fast bound"
+  - "ER threshold 0.20 or 0.40"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - SC^2 in the formula — many naïve implementations omit the squaring;
+    that produces a very different curve. Apply the square as published.
+  - Initial KAMA = SMA(close, ER_period); some platforms initialise
+    differently.
+look_ahead_bias_warnings: "Standard close-of-day signal."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "10/2/30 are author defaults; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - kaufman_efficiency_ratio_filter_v1
+  - clenow_core_trend_v1
+  - carver_ewmac_16_64_v1
+prerequisites: None

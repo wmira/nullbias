@@ -1,0 +1,138 @@
+# =============================================================================
+# Connors RSI 25 / RSI 75 — 4-period RSI extreme strategy with optional add
+# =============================================================================
+
+strategy_id: connors_rsi25_75_v1
+name: "RSI 25 / RSI 75 Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "RSI 25 / RSI 75 chapter; with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "RSI 25 chapter (long), RSI 75 chapter (short)"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: oversold_pullback
+asset_class: [etfs]
+specific_instruments: "SPY, QQQ, broad-market ETFs and sector ETFs"
+timeframe: daily
+holding_period_typical: "2–8 trading days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index and sector ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    LONG (RSI 25):
+      1. close(t) > SMA(close, 200) at bar t
+      2. RSI(close, 4) at bar t < 25
+      3. No long position currently open in this instrument
+    Aggressive add: if a long is already open and RSI(close, 4) at bar t < 20,
+      add a second equal unit (max 2 units total).
+
+    SHORT (RSI 75):
+      1. close(t) < SMA(close, 200) at bar t
+      2. RSI(close, 4) at bar t > 75
+      3. No short position currently open in this instrument
+    Aggressive add: if a short is already open and RSI(close, 4) at bar t > 80,
+      add a second equal unit (max 2 units total).
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 4
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100  # combined max across both units
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Pyramiding: up to 2 equal units total — second unit only on the aggressive RSI threshold"
+  max_concurrent_positions: 1   # 1 instrument, max 2 units
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: |
+    LONG: exit when RSI(close, 4) at bar t > 55      (modern recommendation)
+    SHORT: cover when RSI(close, 4) at bar t < 45    (modern recommendation)
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single exit"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter on each side"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + ~30 bars (RSI(4) Wilder warmup)"
+  benchmark: "Buy-and-hold same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps MOC"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Roughly 1993–2008 in book era; subsequent independent tests through 2024"
+  test_universe: "Liquid ETFs"
+  cagr: "Independent test reported ~8.5% CAGR since 2000 with the modern exit (RSI > 55)"
+  sharpe: NOT_SPECIFIED
+  max_dd: "~16% in modern independent tests"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~1,300 in cited independent test"
+  notes: |
+    Original book exit was RSI > 75 (long) but the larger drawdowns at that
+    threshold caused the canonical recommendation to migrate to RSI > 55.
+    Both variants are documented in the book.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Original exit at RSI(4) > 75 (more drawdown)"
+  - "Tighter exit at RSI(4) > 50 for shorter holds"
+  - "Substitute RSI(2) for sharper entries — converges to connors_rsi2_v1"
+  - "Apply to single stocks above $5 with liquidity filter"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 4-period RSI uses Wilder smoothing, consistent with author convention.
+  - Aggressive-add unit is documented but optional; default canonical version
+    can be implemented without scale-in by ignoring rule 3.
+  - On the short side (RSI 75) the 'add at RSI > 80' is the symmetric
+    interpretation; book uses long-side language.
+look_ahead_bias_warnings: "Close-of-day signal — see RSI(2) note."
+survivorship_bias_warnings: "Negligible (ETF universe)."
+data_snooping_warnings: "RSI thresholds 25/75 are common quanta; sweep neighbors."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_r3_v1
+  - connors_pct_b_v1
+  - connors_tps_v1
+prerequisites: None

@@ -1,0 +1,143 @@
+strategy_id: lopez_de_prado_triple_barrier_v1
+name: "Triple-Barrier Labeling Method"
+author: Marcos López de Prado
+
+source:
+  type: book
+  title: "Advances in Financial Machine Learning"
+  chapter_or_url: "Chapter 3 (Labeling)"
+  publication_year: 2018
+  page_or_section: "Chapter 3"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: ml_labeling_methodology_overlay
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any instrument — used as labeling overlay for ML strategies"
+timeframe: daily
+holding_period_typical: "N/A — labeling methodology"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying ML strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    LABELING METHODOLOGY for supervised ML on time series.
+
+    For each entry timestamp t (event), compute the label by tracking
+    forward price action against THREE barriers:
+
+    1. Upper barrier (profit target):
+         pt = entry_price × (1 + α × σ_t)
+         where σ_t = volatility-adapted target (typically rolling
+         daily std × sqrt(holding_days))
+         α = e.g., 2 (target = 2σ above entry)
+
+    2. Lower barrier (stop loss):
+         sl = entry_price × (1 - β × σ_t)
+         β = e.g., 2
+
+    3. Time barrier (vertical):
+         expiry_t = t + N bars (e.g., 5 days)
+
+    Track price path forward from t. Label = sign of which barrier
+    is hit first:
+      +1 if upper barrier hit first    (profit signal)
+      -1 if lower barrier hit first    (loss signal)
+       0 if time barrier hit first     (no signal)
+
+    Use these labels as targets for ML supervised learning.
+    Replaces fixed-horizon "sign of next-N-day return" labels.
+  indicators_used:
+    - name: rolling_volatility
+      lookback_period: 252
+      formula_reference: "EWMA stdev of daily returns; or Garman-Klass volatility from OHLC"
+      applied_to: returns
+    - name: vertical_time_barrier
+      lookback_period: "User-defined (typically 5-21 days)"
+      formula_reference: "Fixed bar count from entry"
+      applied_to: NOT_APPLICABLE
+  entry_price: per_underlying_strategy
+  entry_time: "Event timestamps from primary signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_ml_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Labeling doesn't size positions"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: "daily or intraday"
+  minimum_history_required: "Per ML strategy"
+  benchmark: "Per ML strategy"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per ML strategy"
+  slippage_assumption: "Per ML strategy"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Methodology, demonstrated in book examples"
+  test_universe: "Various"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Triple-barrier creates labels that match what a trader actually
+    cares about (profit hit before loss) — not just final return at
+    a fixed horizon. Works much better as ML training target than
+    fixed-horizon return signs.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Side-aware labeling: incorporate primary model's side prediction"
+  - "Asymmetric barriers (different α and β)"
+  - "Path-dependent barriers (e.g., trailing-stop variant)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - σ_t (volatility) estimation: daily-bar std vs Garman-Klass vs
+    EWMA all valid; document choice.
+  - Vertical time barrier: typical 5-21 bars; longer barriers reduce
+    label noise but also reduce trading frequency.
+  - Implementation: mlfinlab Python library has reference code.
+look_ahead_bias_warnings: "When generating labels for ML training, ALL barriers must be evaluated only with information available at entry; future price path is the LABEL, not the input."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: "α and β multiples are tunable; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - lopez_de_prado_meta_labeling_v1
+  - lopez_de_prado_cusum_filter_v1
+prerequisites: "ML strategy with timestamped events"

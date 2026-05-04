@@ -1,0 +1,131 @@
+# =============================================================================
+# Connors %b Strategy — Bollinger %b mean reversion (5-period base, three-day stretch)
+# =============================================================================
+
+strategy_id: connors_pct_b_v1
+name: "%b (Bollinger Bands) Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "%b chapter; with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "%b chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: bollinger_extreme
+asset_class: [etfs]
+specific_instruments: "Liquid US equity ETFs"
+timeframe: daily
+holding_period_typical: "2–8 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity index and sector ETFs"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t
+    2. percent_b(close, period=5, std=1) at each of bar t, t-1, t-2 < 0.2
+       (i.e., %b has been below 0.2 for three consecutive bars)
+    3. No position currently open in this instrument
+
+    Where percent_b = (close − lower_band) / (upper_band − lower_band)
+    and Bollinger Bands use period 5 and 1 standard deviation (per author).
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: Bollinger_Bands
+      lookback_period: 5
+      formula_reference: "Mid = SMA(close,5); upper = mid + 1*stdev(close,5); lower = mid - 1*stdev(close,5); stdev is sample std (ddof=0 per most charting platforms; ddof=1 acceptable variant — document choice)"
+      applied_to: close
+    - name: percent_b
+      lookback_period: 5
+      formula_reference: "(close - lower) / (upper - lower)"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit when percent_b(close, 5, 1) at bar t > 0.8"
+  stop_loss: None
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Single exit"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "200-SMA filter built into entry"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + 5 bars (Bollinger period)"
+  benchmark: "Buy-and-hold same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "5 bps MOC"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 1993–2008"
+  test_universe: "Liquid ETFs"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports high win rates on ETFs in book"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Stricter: %b < -0.1 for four consecutive bars (deeper oversold, fewer signals)"
+  - "Standard 20-period 2-stdev Bollinger Bands instead of 5/1"
+  - "Add volume filter (e.g., volume > 1.5x 50-day avg)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author's Bollinger configuration of 5 periods × 1 stdev is unusual but
+    is the published parameterization. Implementations that swap to the
+    standard 20×2 Bollinger differ materially in signal frequency.
+  - Sample stdev convention (population vs sample, ddof=0 vs ddof=1) varies
+    by platform. TA-Lib uses ddof=0; pandas default is ddof=1. Document
+    the choice in implementation; difference is small at period 5.
+look_ahead_bias_warnings: "Close-of-day signal; see RSI(2) note."
+survivorship_bias_warnings: "Negligible (ETF universe)."
+data_snooping_warnings: "5/1 Bollinger is non-standard and arguably overfit; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_r3_v1
+  - connors_rsi25_75_v1
+prerequisites: None

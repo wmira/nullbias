@@ -1,0 +1,132 @@
+strategy_id: clenow_ftt_diversified_breakout_v1
+name: "Following the Trend — Diversified Multi-Window Breakout (Slower Variant)"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Following the Trend, 2nd ed."
+  chapter_or_url: "Variation chapter testing alternative window lengths; followingthetrend.com 'Trading System Rules' section"
+  publication_year: 2022
+  page_or_section: "Variations chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: donchian_breakout_with_atr_stop_slow_variant
+asset_class: [futures]
+specific_instruments: "Same diversified futures universe as core FTT"
+timeframe: daily
+holding_period_typical: "Months — longer than core variant"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Same as clenow_core_trend_v1"
+liquidity_filter: "Same"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Slower 100-day breakout with EMA confirmation. Same structure as core
+    FTT but with longer windows:
+
+    Long entry at close of bar t if:
+      1. close(t) > rolling_max(close, 100)[t-1]    (100-day breakout)
+      2. EMA(close, 100)[t] > EMA(close, 200)[t]
+      3. No long position currently open
+
+    Short symmetric.
+  indicators_used:
+    - name: rolling_max
+      lookback_period: 100
+      formula_reference: "max(close) over prior 100 bars (exclusive of t)"
+      applied_to: close
+    - name: rolling_min
+      lookback_period: 100
+      formula_reference: "min(close) over prior 100 bars (exclusive of t)"
+      applied_to: close
+    - name: EMA
+      lookback_period: 100
+      formula_reference: "ewm(span=100)"
+      applied_to: close
+    - name: EMA
+      lookback_period: 200
+      formula_reference: "ewm(span=200)"
+      applied_to: close
+    - name: ATR
+      lookback_period: 100
+      formula_reference: "100-day Wilder ATR"
+      applied_to: high_low_close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day or next-day open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: atr_volatility_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Sized so 1×ATR(100) move ≈ 20 bps portfolio impact"
+    volatility_target: "20 bps per ATR-day"
+    atr_multiple: 1.0
+  scaling_rules: none
+  max_concurrent_positions: "All instruments where signal active"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: "3 × ATR(100) trailing stop"
+  signal_reversal: "Optional: opposite-side breakout"
+  exit_priority: "Trailing stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (max of EMA-200 and rolling-max-100 + ATR-100)"
+  benchmark: "BTOP50"
+  starting_capital: "$1M+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade through 2022"
+  test_universe: "Diversified futures"
+  cagr: "Slightly lower than core variant but with lower turnover"
+  sharpe: "Comparable to core; slightly lower trading costs"
+  max_dd: NOT_SPECIFIED
+  win_rate: "Even lower than core (~25-35%); compensated by larger winners"
+  avg_win_loss_ratio: "Higher than core variant"
+  num_trades: "Roughly half of core 50-day variant"
+  notes: "Author tests this as a slower-trend variant; valuable for cost-sensitive instruments where the 50-day variant whipsaws."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "200-day breakout (still slower)"
+  - "Combine 50/100 in equal-weighted ensemble (multi-speed)"
+  - "Adjust ATR stop to 4 ATR for fewer whipsaws"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Same conventions as clenow_core_trend_v1 with parameters scaled up.
+  - 'Exclusive of bar t' breakout convention preserved.
+look_ahead_bias_warnings: "Same as core."
+survivorship_bias_warnings: "Negligible."
+data_snooping_warnings: "100/200 windows are conventional; not heavily tuned."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_core_trend_v1
+  - carver_breakout_80_v1
+  - carver_ewmac_64_256_v1
+prerequisites: None

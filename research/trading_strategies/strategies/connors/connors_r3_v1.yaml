@@ -1,0 +1,130 @@
+# =============================================================================
+# Connors R3 — three consecutive declining RSI(2) values, mean-reversion ETF buy
+# =============================================================================
+
+strategy_id: connors_r3_v1
+name: "R3 Strategy"
+author: Larry Connors
+
+source:
+  type: book
+  title: "High Probability ETF Trading"
+  chapter_or_url: "Chapter dedicated to the R3 strategy; co-authored with Cesar Alvarez"
+  publication_year: 2009
+  page_or_section: "R3 chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: oversold_pullback
+asset_class: [etfs]
+specific_instruments: "Liquid US equity ETFs (SPY, QQQ, IWM, sector and country ETFs in author's universe)"
+timeframe: daily
+holding_period_typical: "2–5 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Connors' default ETF universe: SPY, QQQ, IWM, plus liquid sector and country ETFs"
+liquidity_filter: "ETF AUM and average daily volume sufficient for retail size; no specific threshold given"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All of the following must be true at the close of bar t:
+    1. close(t) > SMA(close, 200) at bar t
+    2. RSI(close, 2) at bar t-2 > 60                # initial RSI starts elevated
+    3. RSI(close, 2) at bar t-1 < RSI(close, 2) at bar t-2
+    4. RSI(close, 2) at bar t   < RSI(close, 2) at bar t-1
+    5. RSI(close, 2) at bar t   < 10                # ends deeply oversold
+    6. No position currently open in this instrument
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: RSI
+      lookback_period: 2
+      formula_reference: "Wilder's smoothing"
+      applied_to: close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close of bar t"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100  # canonical single-instrument demo; multi-ETF allocation up to user
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1   # canonical single-instrument; portfolio variants allow N positions
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close long when RSI(close, 2) > 70"
+  stop_loss: "None per author"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Only one exit; not applicable"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Embedded in 200-SMA entry filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA warmup) plus 2 lookback days for RSI sequence"
+  benchmark: "Buy-and-hold of the same ETF"
+  starting_capital: 100000
+  commission_assumption: "$0 (modern retail)"
+  slippage_assumption: "0 bps for close fills; 5 bps for liquid ETFs market-on-close"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 1993–2008 in book era"
+  test_universe: "Author's ETF universe"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: "Author reports high win rates in 70–85% range across ETFs in book"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Specific aggregate stats not reproduced here; per-ETF tables in book."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Loosen entry to 'RSI(2) < 20' on bar t for more frequent signals"
+  - "Add 'close < SMA(close, 5)' as additional filter (per derivative literature)"
+  - "Exit at RSI(2) > 50 (more conservative) or hold until close > SMA(close, 5)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Condition 'first drop must be from above 60' is documented as RSI(2) at
+    t-2 > 60. Some third-party reproductions interpret it as the first of
+    three consecutive lower readings without enforcing the > 60 prior.
+    Author's text supports the stricter form, which is encoded above.
+  - Wilder smoothing assumed for the 2-period RSI as in all Connors work.
+look_ahead_bias_warnings: |
+  - Signal uses close(t); fill at close(t) requires MOC. T+1 open fills
+    are an acceptable variant.
+survivorship_bias_warnings: "ETF universe is largely survivorship-immune."
+data_snooping_warnings: |
+  - The threshold pair (60, 10) is unusual; author justifies it as the
+    minimum 'high enough' RSI to ensure the prior trend was healthy.
+    Sensitivity to these thresholds is high — perform parameter sweeps.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_rsi2_v1
+  - connors_rsi25_75_v1
+  - connors_pct_b_v1
+prerequisites: None

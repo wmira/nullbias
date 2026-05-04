@@ -1,0 +1,129 @@
+strategy_id: alvarez_weekly_sp500_meanrev_rotation_v1
+name: "Weekly Mean Reversion Rotation on S&P 500 Stocks"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "Weekly Mean Reversion Rotation Strategy on S&P500 Stocks"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/weekly-mean-reversion-rotation-strategy-on-sp500-stocks/"
+  publication_year: 2018
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: rotation_top_n_pulled_back
+asset_class: [equities]
+specific_instruments: "Current S&P 500 constituents"
+timeframe: weekly
+holding_period_typical: "5 trading days (1 week)"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting all of:
+  - Currently a member of the S&P 500 index (use point-in-time membership for backtests)
+  - close > SMA(close, 200)
+  - And the S&P 500 index itself (SPY) is also above its 200-day SMA
+liquidity_filter: "Implicit via S&P 500 membership"
+fundamental_filter: "S&P 500 inclusion criteria"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each week (Friday close):
+    1. SPY close > SMA(SPY.close, 200)            (regime filter)
+    2. Build the eligible set: stocks in S&P 500 with close > SMA(close, 200)
+    3. Rank eligible stocks ascending by 5-day total return (most-sold-off first)
+    4. Buy the 5 stocks with the lowest 5-day return at next Monday's open
+       (or use Friday close if executing same-bar)
+    5. Hold for exactly 1 week
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: ROC
+      lookback_period: 5
+      formula_reference: "(close[t] / close[t-5]) - 1; rank ascending"
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "Monday open after Friday signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 20      # 100% / 5 names
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 5
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Exit at end of next week (5 trading days after entry)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Time stop is sole exit"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "SPY > SMA(200) (no entries when bear regime)"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "200 bars for SMA + 5 bars for ROC"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or $0.005/share"
+  slippage_assumption: "10 bps per fill"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2018 in original post"
+  test_universe: "S&P 500"
+  cagr: "Author reports outperformance vs SPY in his post"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "See blog post downloadable spreadsheet for full stats."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Top 10 names instead of 5 (lower per-name concentration)"
+  - "Rank by 3-day or 7-day return instead of 5"
+  - "Add minimum-drop filter (e.g., return < -3%)"
+  - "Use intraday limit entry N% below Friday close instead of Monday open"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author states 'top 5 most sold off'; assumed lowest 5-day total return
+    measured Friday close to Friday close (5-day lookback).
+  - Membership uses point-in-time S&P 500 list to avoid survivorship bias.
+  - Author does not explicitly state Monday-open vs Friday-close fill;
+    Monday-open is the more conservative live-tradable assumption.
+look_ahead_bias_warnings: |
+  - Using current S&P 500 membership (not point-in-time) creates significant
+    survivorship bias on a US stock universe. This is the single most
+    important pitfall.
+survivorship_bias_warnings: "Material — point-in-time index membership required."
+data_snooping_warnings: "Top-5 cutoff is heuristic; sweep 3/5/7/10 to check robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_rsi2_rule_change_v1
+  - alvarez_abc_meanrev_v1
+  - connors_rsi2_v1
+prerequisites: None

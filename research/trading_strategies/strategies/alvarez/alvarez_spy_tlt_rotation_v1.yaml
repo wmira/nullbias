@@ -1,0 +1,127 @@
+strategy_id: alvarez_spy_tlt_rotation_v1
+name: "SPY/TLT Monthly Rotation"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "SPY TLT Rotation"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/spy-tlt-rotation/"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: two_asset_relative_strength
+asset_class: [etfs, bonds]
+specific_instruments: "SPY, TLT (and SHY/cash as fallback)"
+timeframe: monthly
+holding_period_typical: "1 month minimum"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Two-asset universe: SPY and TLT (with optional SHY/cash)"
+liquidity_filter: "Implicit — all highly liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month:
+    1. Compute return_3m for both SPY and TLT:
+       return_3m = (close / close[63]) - 1
+    2. Apply regime filter on each:
+       eligible_SPY = (close_SPY > SMA(close_SPY, 200))
+       eligible_TLT = (close_TLT > SMA(close_TLT, 100))    # bond proxy faster MA
+    3. Among eligible candidates, buy the one with the higher return_3m.
+    4. If neither is eligible, hold SHY (cash-like).
+    5. If only one is eligible, hold that one.
+  indicators_used:
+    - name: ROC
+      lookback_period: 63
+      formula_reference: "(close[t] / close[t-63]) - 1"
+      applied_to: close
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: SMA
+      lookback_period: 100
+      formula_reference: simple
+      applied_to: "close (TLT)"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_into_single_asset
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation"
+  trailing_stop: None
+  signal_reversal: "Per-month"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-asset SMA filters built into eligibility"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars per asset"
+  benchmark: "60/40 SPY/TLT"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "3 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2017"
+  test_universe: "SPY, TLT"
+  cagr: "Comparable to or slightly better than 60/40"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Lower than SPY buy-and-hold; vulnerable in 2022"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "6m return instead of 3m"
+  - "Drop SMA filters entirely (pure relative strength)"
+  - "Add SSO leverage when bull-and-low-vol"
+  - "Three-asset version (add gold GLD)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 3m return uses 63 trading days.
+  - Author's exact SMA lengths for the regime filter vary across his
+    posts; defaulted to 200 for SPY and 100 for TLT (faster bond moves).
+  - SHY fallback when neither asset is eligible.
+look_ahead_bias_warnings: "EOM signal, next-open fill."
+survivorship_bias_warnings: "None (two liquid ETFs)."
+data_snooping_warnings: "Lookback windows are heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_spy_sso_tlt_v1
+  - alvarez_50_50_spy_v1
+  - alvarez_etf_bond_rotation_v1
+prerequisites: None

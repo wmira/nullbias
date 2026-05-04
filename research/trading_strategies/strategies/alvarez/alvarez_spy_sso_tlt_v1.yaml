@@ -1,0 +1,132 @@
+strategy_id: alvarez_spy_sso_tlt_v1
+name: "SPY/SSO/TLT Regime-Aware Strategy"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "SPY, SSO and TLT Strategy"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/spy-sso-and-tlt-strategy/"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: regime_switch_with_leverage
+asset_class: [etfs]
+specific_instruments: "SPY (S&P 500), SSO (2x S&P 500), TLT (long Treasuries)"
+timeframe: monthly
+holding_period_typical: "1 month minimum, often multi-month while regime persists"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Three-asset universe: SPY, SSO, TLT"
+liquidity_filter: "All three are highly liquid"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+
+    Regime test 1 — bull / bear:
+      bull = SPY close > SMA(SPY.close, 200)
+
+    Regime test 2 — low volatility (only evaluated if bull):
+      low_vol = realized_vol_20d(SPY) < threshold
+      where realized_vol_20d = stdev of 20 daily returns × sqrt(252)
+      threshold = author's published threshold (~12% annualised)
+
+    Allocation:
+      - If bull AND low_vol → buy SSO (2x leverage)
+      - Else if bull AND NOT low_vol → buy SPY
+      - Else (bear) → buy TLT
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: "close (SPY)"
+    - name: realized_volatility
+      lookback_period: 20
+      formula_reference: "stdev of last 20 daily returns × sqrt(252) for annualised"
+      applied_to: "returns (SPY)"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_into_single_asset
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Monthly re-evaluation; rotate to whichever asset matches regime"
+  trailing_stop: None
+  signal_reversal: "Per-month re-evaluation"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Built into entry rule"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SPY SMA)"
+  benchmark: "SPY buy-and-hold or 60/40 SPY/TLT"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2017"
+  test_universe: "SPY/SSO/TLT"
+  cagr: "Slightly better than SPY buy-and-hold"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Significantly reduced vs SPY"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Author's analysis notes that the SSO leverage rule mostly added volatility
+    rather than excess return. The bear-market TLT rotation has historically
+    helped — but failed during the 2022 stocks-and-bonds drawdown.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop SSO entirely (SPY-or-TLT only)"
+  - "Use SHY (cash-like) instead of TLT in bear regime"
+  - "Use 50/50 SPY+TLT in bear regime instead of all-TLT"
+  - "Adjust low-vol threshold (10%, 15%, 20% annualised)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - The exact low-vol threshold is parameterized in the author's spreadsheet
+    rather than a single fixed number; default to 12% annualised
+    realised vol of SPY as a reasonable centre-point. Document and sweep.
+  - 2022 case: both SPY and TLT drew down materially. The strategy will
+    therefore have a documented historical failure point — note this.
+look_ahead_bias_warnings: "EOM signal, next-session open fill."
+survivorship_bias_warnings: "None (three liquid ETFs)."
+data_snooping_warnings: "Two-rule regime model is simple but the threshold value is sensitive."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_spy_tlt_rotation_v1
+  - alvarez_50_50_spy_v1
+  - alvarez_etf_bond_rotation_v1
+prerequisites: None

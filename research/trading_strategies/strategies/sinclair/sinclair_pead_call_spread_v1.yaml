@@ -1,0 +1,140 @@
+strategy_id: sinclair_pead_call_spread_v1
+name: "Post-Earnings Announcement Drift via Short-Dated Call Spread"
+author: Euan Sinclair
+
+source:
+  type: book
+  title: "Positional Option Trading"
+  chapter_or_url: "PEAD chapter"
+  publication_year: 2020
+  page_or_section: "Earnings effects chapter"
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: earnings_effect_directional_options
+asset_class: [options]
+specific_instruments: "Equities with positive earnings surprises (and listed options)"
+timeframe: daily
+holding_period_typical: "30-60 days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Stocks that have just announced earnings with positive surprise (EPS beat AND/OR positive guidance revision)"
+liquidity_filter: "Listed options with adequate liquidity at chosen strikes"
+fundamental_filter: "Earnings surprise size; analyst-revision direction"
+exclusions: "Skip names with imminent secondary events (M&A, regulatory)"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Sinclair documents that post-earnings announcement drift (PEAD)
+    persists for 30-60 days after a positive earnings surprise.
+
+    Setup (for each name reporting):
+    1. Earnings announcement: post-market or pre-market
+    2. Surprise: actual EPS > consensus by ≥ 1 standard deviation
+       (analyst-estimate dispersion-normalised)
+    3. Day-after price move: positive AND volume confirming
+    4. Enter on day after earnings announcement (T+1) or day 2
+
+    Construction:
+    - LONG short-dated 40-delta call (about 1-month DTE)
+    - SHORT 10-delta call same expiration (further OTM)
+    - Net debit spread; max profit at upper strike, max loss = debit
+      paid
+
+    Why call spread vs long call:
+    - Buys back some of the elevated post-earnings IV via the short leg
+    - Reduces theta decay
+    - Caps upside but PEAD typically isn't a 30%+ move
+  indicators_used:
+    - name: earnings_surprise_ratio
+      lookback_period: "Per-earnings event"
+      formula_reference: "(actual_EPS - consensus_EPS) / std(analyst_estimates)"
+      applied_to: "fundamentals"
+    - name: option_delta
+      lookback_period: 1
+      formula_reference: "Black-Scholes delta at chosen strikes"
+      applied_to: "option chain"
+  entry_price: net_debit_limit_order
+  entry_time: "Day after earnings announcement at open or mid-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: bp_per_position_capped
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2  # smaller per name due to single-event risk
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "BP = debit × 100 × contracts (max risk known at entry)"
+  max_concurrent_positions: "Multiple names per earnings season"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "50-75% of max profit"
+  stop_loss: "Optional: 50% of debit"
+  time_stop: "21 DTE OR 30 days post-earnings, whichever sooner"
+  trailing_stop: None
+  signal_reversal: "Stock breaks below pre-earnings price"
+  exit_priority: "PT → time stop → stop loss → reversal"
+  exit_price: net_debit_limit_order
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "PEAD effect weakens in down markets"
+  correlation_limits: "Earnings season produces many correlated positions"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "earnings calendar with consensus estimates and actuals"
+    - "option chain history"
+  data_frequency: daily
+  minimum_history_required: "Several earnings cycles per name"
+  benchmark: "Buy-and-hold long shares post-surprise"
+  starting_capital: 100000
+  commission_assumption: "Per-contract × 2 legs"
+  slippage_assumption: "1-2 cents per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade academic literature on PEAD"
+  test_universe: "US equities with earnings"
+  cagr: NOT_SPECIFIED
+  sharpe: "Sinclair claims call spread captures most of PEAD edge with limited downside"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Earnings-cycle-driven (4 per name per year)"
+  notes: |
+    PEAD is one of the most-documented anomalies in academic finance.
+    Sinclair's contribution is choosing the option structure that
+    maximises capture: 40/10 call spread is the cheapest way to leverage
+    the move while limiting cost from elevated post-earnings IV.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Long call (no short leg) — more upside, more cost"
+  - "Bull put spread (similar structure, different greeks)"
+  - "Symmetric for negative surprises (short-dated put spread)"
+  - "Hold to expiration vs early close at PT"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Earnings surprise definition varies; use consensus from multiple
+    sources (Refinitiv, Zacks, etc.) for robustness.
+  - Surprise threshold (≥ 1 stdev) is heuristic; sweep 0.5-2.0 stdev.
+  - 40/10 delta strikes are approximate; nearest available strikes
+    often differ.
+look_ahead_bias_warnings: "Use point-in-time consensus estimates known BEFORE earnings."
+survivorship_bias_warnings: "Material on stock universe."
+data_snooping_warnings: "Strike-delta choice and time-stop tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - sinclair_variance_risk_premium_v1
+  - sinclair_term_structure_premium_v1
+prerequisites: "Earnings data feed; spreads-level options trading"

@@ -1,0 +1,140 @@
+strategy_id: alvarez_connorsrsi_pullback_v1
+name: "ConnorsRSI Pullback (Alvarez Variant with Limit-Order Entry)"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "ConnorsRSI Analysis"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/connorsrsi-analysis/"
+  publication_year: 2018
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: composite_oversold_with_limit_entry
+asset_class: [equities]
+specific_instruments: "S&P 500 stocks (point-in-time)"
+timeframe: daily
+holding_period_typical: "3–8 trading days"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - S&P 500 membership (point-in-time)
+  - close > $5
+  - 21-day average daily volume > 250,000 shares
+  - 21-day average dollar volume > $10M
+liquidity_filter: "Both share-volume and dollar-volume filters"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    All conditions at the close of bar t:
+    1. close(t) > SMA(close, 200)
+    2. ADX(10) at bar t > 30                         (trending environment)
+    3. low(t) <= close(t-1) * (1 - 0.02)              (lowest price ≥ 2% below
+                                                       prior close)
+    4. (close(t) - low(t)) / (high(t) - low(t)) <= 0.25
+                                                      (close in bottom 25% of
+                                                       day's range)
+    5. ConnorsRSI(3, 2, 100)[t] < 5
+    6. No position already open
+
+    If multiple candidates fire, rank ascending by ConnorsRSI value
+    (lowest first).
+    Place a limit buy order for day t+1 at close(t) * 0.90.
+    Fill if low(t+1) <= limit; otherwise cancel.
+  indicators_used:
+    - name: SMA
+      lookback_period: 200
+      formula_reference: simple
+      applied_to: close
+    - name: ADX
+      lookback_period: 10
+      formula_reference: "Wilder ADX"
+      applied_to: high_low_close
+    - name: ConnorsRSI
+      lookback_period: "(3, 2, 100)"
+      formula_reference: "Avg of RSI(close,3), RSI(streak,2), PercentRank(roc1,100). See connors_crsi_pullback_v1 for full definition."
+      applied_to: close
+  entry_price: "Limit order at 0.90 * close(t) on day t+1"
+  entry_time: "Intraday on t+1 if low(t+1) <= limit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 10
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Exit at next open after ConnorsRSI(3,2,100) > 70"
+  stop_loss: None
+  time_stop: "10 bars (next open after 10 bars in trade)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Profit target first; time stop second"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Per-stock 200-SMA only (not an index regime gate)"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars (SMA) + 100 bars (PercentRank lookback) + ADX warmup"
+  benchmark: "SPY buy-and-hold"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5–10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Approximately 2007–2018"
+  test_universe: "S&P 500"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Author tests multiple variations; this YAML codifies the most-stringent published variant."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop ADX filter (broader signal set)"
+  - "Limit distance 5% or 7% instead of 10%"
+  - "Lower close-in-range threshold to 50% (loosens)"
+  - "Use 21-day instead of 100-day PercentRank inside ConnorsRSI"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - ADX > 30 acts as 'this stock has been trending; treat the pullback
+    as a counter-trend opportunity'. Some find this counterintuitive —
+    note the author's choice.
+  - 'Close in bottom 25% of day's range' interpreted as
+    (close - low) / (high - low) ≤ 0.25, with edge cases when
+    high == low (intraday flat) treated as no signal.
+look_ahead_bias_warnings: "Limit order at 0.9 * close(t) for t+1 — no look-ahead. Fill on low(t+1)."
+survivorship_bias_warnings: "Material — use point-in-time S&P 500 membership."
+data_snooping_warnings: "Multiple thresholds; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_crsi_pullback_v1
+  - alvarez_abc_meanrev_v1
+  - alvarez_rsi2_rule_change_v1
+prerequisites: None

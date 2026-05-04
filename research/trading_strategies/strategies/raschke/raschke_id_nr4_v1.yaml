@@ -1,0 +1,136 @@
+strategy_id: raschke_id_nr4_v1
+name: "ID/NR4 — Inside Day with 4-Bar Narrowest Range Breakout"
+author: Linda Raschke
+
+source:
+  type: book
+  title: "Street Smarts"
+  chapter_or_url: "ID/NR4 chapter; with Larry Connors"
+  publication_year: 1995
+  page_or_section: "ID/NR4 chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: volatility_contraction_breakout
+asset_class: [equities, futures, etfs]
+specific_instruments: "Liquid daily-chart instruments"
+timeframe: daily
+holding_period_typical: "1-5 days"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid stocks, futures, ETFs"
+liquidity_filter: "Adequate volume"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Setup at bar t (the ID/NR4 bar):
+    1. INSIDE DAY: high(t) ≤ high(t-1) AND low(t) ≥ low(t-1)
+       (today is fully contained within yesterday's range)
+    2. NR4: range(t) < range(t-k) for k = 1, 2, 3
+       (today's range is the narrowest of the last 4 bars)
+
+    Both conditions must be true on the same bar t.
+
+    Execution at bar t+1 (breakout day):
+    3. Place a buy stop at high(t) + 1 tick (long-side breakout)
+    4. Place a sell stop at low(t) - 1 tick (short-side breakout)
+    5. Whichever fires first defines the trade direction.
+    6. Cancel the other order.
+    7. Order good for one day; cancel at close of t+1 if neither fires.
+
+    Logic: Volatility contraction (NR4) inside a tightening range (ID)
+    typically precedes a volatility expansion. Direction is determined
+    by which side the price first breaks.
+  indicators_used:
+    - name: bar_range
+      lookback_period: 1
+      formula_reference: "high - low"
+      applied_to: high_low
+    - name: inside_bar_check
+      lookback_period: 2
+      formula_reference: "high(t) ≤ high(t-1) AND low(t) ≥ low(t-1)"
+      applied_to: high_low
+    - name: nr4_check
+      lookback_period: 4
+      formula_reference: "range(t) is the minimum of {range(t-3), range(t-2), range(t-1), range(t)}"
+      applied_to: "bar range series"
+  entry_price: stop_above_or_below_setup_bar
+  entry_time: "Day t+1 intraday — first stop hit"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: 1
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Position = (equity × 1%) / (entry - opposite stop)"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Optional: 2× the setup bar's range from entry; or trail"
+  stop_loss: "Opposite side of the setup bar (i.e., the other stop level)"
+  time_stop: "5-bar time stop"
+  trailing_stop: "Optional: trail behind 2-day low (long) / 2-day high (short)"
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "Stop → trailing → time stop → target"
+  exit_price: market_or_stop
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "4 bars"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail or per-contract"
+  slippage_assumption: "5-10 bps; intraday slippage on stop fills"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Pre-1995"
+  test_universe: "Futures, stocks"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Volatility-contraction-then-expansion is a documented market microstructure phenomenon. Setup is mechanically clean and easy to backtest."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "NR7 (narrowest of last 7 bars) — see raschke_nr7_v1"
+  - "ID/NR7 (inside day + 7-bar narrowest)"
+  - "Apply on weekly charts for swing trades"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 'NR4' = today's range is strictly less than each of the prior 3
+    bars' ranges. Some sources define as 'narrowest of last 4 bars
+    inclusive of today' — same result.
+  - Bracket orders (buy stop above, sell stop below) require broker
+    support; otherwise place orders sequentially and cancel the
+    unused one when the first fires.
+look_ahead_bias_warnings: "Stop entries — true forward-looking."
+survivorship_bias_warnings: "Material on stocks."
+data_snooping_warnings: "NR4 is a common pattern; works on many timeframes."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - raschke_nr7_v1
+  - clenow_core_trend_v1
+prerequisites: None

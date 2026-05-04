@@ -1,0 +1,139 @@
+strategy_id: gray_qval_etf_v1
+name: "QVAL ETF — Live Implementation of Quantitative Value"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: paper
+  title: "QVAL ETF — Quantitative Value Index methodology"
+  chapter_or_url: "https://funds.alphaarchitect.com/qval/ ; investment case PDFs on alphaarchitect.com"
+  publication_year: 2014
+  page_or_section: "ETF prospectus + factsheet"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: quant_value_etf_methodology
+asset_class: [equities]
+specific_instruments: "US mid- and large-cap stocks meeting QVAL index criteria"
+timeframe: quarterly
+holding_period_typical: "~3 months between rebalances"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Eligible universe per QVAL index methodology:
+  - Listed on major US exchange
+  - Mid-cap or larger market cap
+  - Adequate liquidity
+  - Excluding REITs, financials, and utilities
+liquidity_filter: "Investable size for ETF"
+fundamental_filter: "REITs, financials, utilities excluded"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Quarterly rebalance:
+
+    1. Forensic accounting screen (Beneish M-Score, Altman Z-Score,
+       accruals/CFO check) — drop high-risk names.
+    2. Quality screen — drop bottom-tier names by F-Score / quality
+       composite.
+    3. Cheapness ranking — sort surviving universe by EBIT/EV descending
+       (cheapest first).
+    4. Select top 50 names by EBIT/EV from the post-screen universe.
+    5. Equal-weight.
+    6. Apply ETF-level constraints (sector cap, single-name cap).
+  indicators_used:
+    - name: Beneish_M_Score
+      lookback_period: "Latest fiscal period"
+      formula_reference: "Same as gray_quant_value_v1"
+      applied_to: "fundamentals"
+    - name: Altman_Z_Score
+      lookback_period: "Latest fiscal period"
+      formula_reference: "Same as gray_quant_value_v1"
+      applied_to: "fundamentals"
+    - name: Piotroski_F_Score
+      lookback_period: "Latest fiscal period + prior year"
+      formula_reference: "Same as gray_quant_value_v1"
+      applied_to: "fundamentals"
+    - name: EBIT_EV
+      lookback_period: "TTM"
+      formula_reference: "trailing_12mo_EBIT / (market_cap + total_debt - cash)"
+      applied_to: "fundamentals"
+  entry_price: market_open_next_bar
+  entry_time: "Set rebalance date"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 2
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 50
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Quarterly rebalance"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: "Per ETF prospectus"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "fundamentals"
+    - "market data"
+  data_frequency: "quarterly fundamentals; daily prices"
+  minimum_history_required: "2 years of fundamentals"
+  benchmark: "S&P 500 Value Index / Russell 1000 Value"
+  starting_capital: 100000
+  commission_assumption: "$0 retail (or hold QVAL ETF at ~0.39% expense ratio)"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Live since Oct 2014"
+  test_universe: "QVAL eligible US universe"
+  cagr: "Live tracking; results at funds.alphaarchitect.com"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Deep-value strategy — wide value-vs-glamour spreads when value is in/out of favor."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "IVAL — international version"
+  - "QGRO — sister ETF combining quality and growth signals"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - This YAML codifies the LIVE ETF methodology — slightly different from
+    the book version (gray_quant_value_v1) due to investability and
+    sector-cap constraints.
+  - Forensic + quality + cheapness three-stage screen is the published
+    methodology summary.
+look_ahead_bias_warnings: "Use lagged fundamentals (3-month delay typical)."
+survivorship_bias_warnings: "Eliminated in live ETF tracking."
+data_snooping_warnings: "Live since 2014 provides OOS evidence."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_quant_value_v1
+  - gray_magic_formula_v1
+  - gray_ebit_ev_value_v1
+prerequisites: None

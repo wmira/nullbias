@@ -1,0 +1,133 @@
+strategy_id: chan_bollinger_meanrev_v1
+name: "Bollinger Band Mean Reversion (Stationary Spread or Single Asset)"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Mean reversion chapters; Quantra course"
+  publication_year: 2013
+  page_or_section: "Bollinger band mean reversion chapter"
+
+# === STRATEGY METADATA ===
+category: mean_reversion
+sub_category: bollinger_band_with_neutral_zone
+asset_class: [equities, etfs]
+specific_instruments: "Stationary spreads (cointegrated pairs) or individual stocks/ETFs that pass mean-reversion tests"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Underlyings (or spreads) demonstrated to be mean-reverting via ADF / variance ratio / Hurst tests"
+liquidity_filter: "Liquid for trading"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Skip names/spreads that fail mean-reversion tests"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation. For a series Y_t (price or spread):
+
+    1. Rolling SMA: μ_t = SMA(Y, N)        (typically N=20)
+    2. Rolling stdev: σ_t = stdev(Y, N)
+    3. Bollinger bands:
+         upper_t = μ_t + k_entry × σ_t      (typical k_entry = 2)
+         lower_t = μ_t - k_entry × σ_t
+    4. Trade rules with neutral zone:
+         If Y_t > upper_t        → SHORT (expect mean reversion down)
+         If Y_t < lower_t        → LONG  (expect mean reversion up)
+         If |Y_t - μ_t| < k_exit × σ_t (typical k_exit = 0.5) → close all positions
+         (Between k_exit and k_entry: hold existing position, no new entries)
+
+    Two-regime structure (Chan's variant):
+    - Positive deviation regime (Y > μ): only short entries allowed
+    - Negative deviation regime (Y < μ): only long entries allowed
+    - Optional 'neutral zone' between k_exit and k_entry where no action.
+  indicators_used:
+    - name: SMA
+      lookback_period: 20
+      formula_reference: simple
+      applied_to: "price or spread"
+    - name: rolling_stdev
+      lookback_period: 20
+      formula_reference: "Sample standard deviation; ddof=1 typical, ddof=0 alternative"
+      applied_to: "price or spread"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity_or_dollar_neutral_for_spread
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Optional: scale position size with deviation magnitude (more deviation → bigger position)"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when |Y_t - μ_t| < k_exit × σ_t (default k_exit = 0.5)"
+  stop_loss: "Optional: close on extreme deviation |z| > 4"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: "Position flips when band crosses on opposite side"
+  exit_priority: "Inner band crossing (mean reversion to neutral zone)"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Apply only when underlying/spread is mean-reverting per ADF or Hurst test"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "20 bars (Bollinger window)"
+  benchmark: "Cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5-10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multiple years in book examples"
+  test_universe: "USO, GLD, EWA/EWC, various stationary spreads"
+  cagr: NOT_SPECIFIED
+  sharpe: "Sharpe of 1+ in book examples on appropriate underlyings"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Strategy fails on trending series — must combine with regime filter (Hurst, variance ratio) for robustness."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different k_entry values (1.5, 2.5, 3)"
+  - "Asymmetric entry/exit thresholds"
+  - "Replace SMA with EMA"
+  - "Apply on log-prices instead of prices"
+  - "Add Kalman-filter-based dynamic mean and variance"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Stdev convention: ddof=1 (sample) is statistically rigorous; ddof=0
+    (population) matches TA-Lib. Document choice; difference at N=20 is small.
+  - Neutral zone (k_exit) is what distinguishes Chan's variant from
+    naive Bollinger trading; eliminates whipsaws near the band edges.
+look_ahead_bias_warnings: "Same-day close signal."
+survivorship_bias_warnings: "Material on stock universes."
+data_snooping_warnings: "k_entry and k_exit thresholds heuristic."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_pct_b_v1
+  - chan_hurst_regime_filter_v1
+  - chan_variance_ratio_filter_v1
+  - alvarez_simple_meanrev_v1
+prerequisites: None

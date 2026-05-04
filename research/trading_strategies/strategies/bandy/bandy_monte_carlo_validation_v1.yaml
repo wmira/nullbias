@@ -1,0 +1,140 @@
+strategy_id: bandy_monte_carlo_validation_v1
+name: "Monte Carlo Validation Methodology"
+author: Howard Bandy
+
+source:
+  type: book
+  title: "Modeling Trading System Performance: Monte Carlo Simulation, Position Sizing, Risk Management, and Statistics"
+  chapter_or_url: "Monte Carlo chapters"
+  publication_year: 2011
+  page_or_section: "MC simulation chapters"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: validation_methodology_monte_carlo
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying strategy with a generated trade list"
+timeframe: daily
+holding_period_typical: "N/A — methodology"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by the underlying strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    OVERLAY methodology applied to a backtest's TRADE LIST.
+
+    1. Run backtest of underlying strategy → produce list of N trade
+       returns: r_1, r_2, ..., r_N
+    2. Bootstrap resample with replacement K times (typically K=10,000):
+         For each iteration k = 1..K:
+           sampled_returns = random.choices(trade_returns, k=N)
+           cumulative_curve_k = compound(sampled_returns)
+           record max_drawdown_k, final_return_k
+    3. Compute distributions:
+         distribution of max_drawdown across K paths
+         distribution of CAGR across K paths
+         5th, 50th, 95th percentile statistics
+    4. Acceptance criteria (Bandy's published heuristics):
+         5th percentile CAGR > 0           (rarely loses overall)
+         95th percentile max_drawdown < risk tolerance  (e.g., 25%)
+
+    The methodology answers: "Given my historical trade list, what is
+    the distribution of outcomes I might see going forward if the
+    process repeats?"
+  indicators_used:
+    - name: bootstrap_resample
+      lookback_period: "All trade returns"
+      formula_reference: |
+        For k in 1..K iterations:
+          sampled = random.sample with replacement from trade_returns
+          curve_k = cumulative product of (1 + sampled)
+        Compute percentiles of max_dd and final_return across curves.
+      applied_to: "trade-return list from backtest"
+  entry_price: per_underlying_strategy
+  entry_time: per_underlying_strategy
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "MC output informs position sizing — Bandy's analysis ties MC drawdown distribution to fractional Kelly sizing"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Stop trading if live drawdown exceeds the 95th percentile of MC distribution"
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: "Per underlying — generates trade list"
+  data_frequency: daily
+  minimum_history_required: "Several hundred trades for stable bootstrap"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Methodology"
+  test_universe: "Demonstrated on multiple strategies"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Bandy's MC framework is more conservative than naïve historical
+    drawdown — it accounts for the possibility of unfavorable trade
+    SEQUENCING (e.g., losses bunched up) even with the same trade
+    distribution.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Block bootstrap (preserve serial correlation)"
+  - "Parametric MC (fit distribution to trade returns, sample from that)"
+  - "Monte Carlo on PARAMETERS rather than trade list (CSCV-style)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Standard bootstrap assumes IID trade returns; reality has some
+    serial correlation (drawdown clustering). Block bootstrap addresses
+    this.
+  - K = 10,000 is canonical; K = 1,000 sufficient for rough estimates.
+look_ahead_bias_warnings: "MC of historical trades doesn't introduce look-ahead but is bounded by historical regime."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: |
+  - MC measures variability around a backtested distribution; it does
+    NOT diagnose if the backtest itself is over-fit. Combine with
+    walk-forward validation for full coverage.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_walk_forward_overlay_v1
+  - bandy_health_check_overlay_v1
+  - lopez_de_prado_cscv_v1
+prerequisites: "Underlying strategy with trade-list output"

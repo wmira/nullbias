@@ -1,0 +1,144 @@
+strategy_id: sinclair_iv_rv_gap_v1
+name: "IV-RV Gap Trade (Implied vs Realized Spread)"
+author: Euan Sinclair
+
+source:
+  type: book
+  title: "Volatility Trading"
+  chapter_or_url: "IV vs RV chapter"
+  publication_year: 2013
+  page_or_section: "Volatility forecasting chapter"
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: implied_minus_realized_spread
+asset_class: [options]
+specific_instruments: "Equity options where IV is liquid and RV is well-defined"
+timeframe: monthly
+holding_period_typical: "30 days (one option cycle)"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid US equity and index options with reliable IV (e.g., SPX, large-cap stocks)"
+liquidity_filter: "Tight bid-ask, deep OI"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "Skip names within 30 days of major events that disrupt RV-IV relationship"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Trade the spread between implied and realized volatility.
+
+    Compute:
+    1. IV_t = current 30-day ATM implied volatility
+    2. RV_t = annualised stdev of last 30 daily log returns × sqrt(252)
+    3. gap_t = IV_t - RV_t
+
+    Compare to historical distribution of gap (rolling 252-day):
+       gap_zscore_t = (gap_t - mean_gap_252) / stdev_gap_252
+
+    Trade rules:
+       gap_zscore > +1: SHORT vol (short straddle/strangle, delta-hedge)
+       gap_zscore < -1: LONG vol (long straddle/strangle)
+       |gap_zscore| < 0.5: close any position
+
+    Logic: when IV is unusually higher than RV, vol is overpriced
+    relative to its own history and reverts down (short premium edge).
+    When IV is unusually low vs RV, vol is underpriced and reverts up
+    (long premium edge — much rarer).
+
+    Sinclair: long-vol trades are HARD because the structural
+    direction of IV-RV gap is positive. Short-vol trades dominate
+    expected return.
+  indicators_used:
+    - name: implied_volatility
+      lookback_period: 1
+      formula_reference: "ATM IV at 30 DTE from option chain"
+      applied_to: "option chain"
+    - name: realized_volatility
+      lookback_period: 30
+      formula_reference: "stdev(log returns) × sqrt(252)"
+      applied_to: returns
+    - name: rolling_zscore_of_gap
+      lookback_period: 252
+      formula_reference: "(gap_t - rolling_mean(gap, 252)) / rolling_stdev(gap, 252)"
+      applied_to: "IV-RV gap series"
+  entry_price: market_or_limit
+  entry_time: "Monthly cycle"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: vega_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Vega exposure proportional to |gap_zscore|; cap at 2-3 stdev"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "Close when gap_zscore mean-reverts to within ±0.5"
+  stop_loss: "Close when gap_zscore extends to ±3 (rare regime shift)"
+  time_stop: "Option expiration"
+  trailing_stop: None
+  signal_reversal: "Reverse position when gap_zscore crosses zero"
+  exit_priority: "Z-reversion → option expiration → stop"
+  exit_price: market_or_limit
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "30-day ATM IV history"
+    - "underlying daily returns"
+  data_frequency: daily
+  minimum_history_required: "252+ days for stable z-score baseline"
+  benchmark: "VRP indices, BXM"
+  starting_capital: 100000
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1-2 cents"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade SPX history"
+  test_universe: "SPX and large-cap equity options"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: "Severe in vol-spike events"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Sinclair: 'IV-RV gap trade IS the variance risk premium harvest, just
+    with a more dynamic entry/exit signal'. Most useful as a sizing and
+    entry-timing overlay on a structural short-vol bias.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use 60-day or 90-day RV for slower signal"
+  - "Use term-structure-aware IV (forward IV)"
+  - "Cross-sectional: rank stocks by gap z-score, long-short the extremes"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - 30-day IV must match holding period for clean comparison.
+  - RV computation: log vs simple returns; close-to-close vs Garman-Klass.
+    Document choice.
+look_ahead_bias_warnings: "RV uses past-only data; IV is current. No look-ahead."
+survivorship_bias_warnings: "Per universe."
+data_snooping_warnings: "z-score thresholds tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - sinclair_variance_risk_premium_v1
+  - sinclair_term_structure_premium_v1
+  - chan_volatility_term_structure_v1
+prerequisites: "Options data feed with IV history"

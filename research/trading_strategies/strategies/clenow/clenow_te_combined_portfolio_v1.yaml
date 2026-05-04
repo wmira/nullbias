@@ -1,0 +1,130 @@
+strategy_id: clenow_te_combined_portfolio_v1
+name: "Trading Evolved — Combined Multi-Strategy Portfolio"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Trading Evolved"
+  chapter_or_url: "Concluding portfolio chapter — combines individual strategies; companion Zipline code"
+  publication_year: 2019
+  page_or_section: "Combined portfolio chapter"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: multi_strategy_portfolio
+asset_class: [equities, etfs, futures]
+specific_instruments: "Multiple instrument sets per underlying strategy"
+timeframe: daily
+holding_period_typical: "Per underlying sub-strategy"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Union of universes from constituent sub-strategies"
+liquidity_filter: "Per sub-strategy"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    This is a META-strategy that runs multiple sub-strategies in parallel
+    and allocates capital across them. The book's example combines:
+
+      40% allocation: clenow_stocks_on_the_move_v1     (US equity momentum)
+      40% allocation: clenow_te_global_macro_momentum_v1 (asset rotation)
+      20% allocation: clenow_te_counter_trend_v1        (mean reversion overlay)
+
+    Each sub-strategy generates positions independently within its own
+    capital allocation. Re-balance allocations to target weights monthly.
+
+    The combined portfolio benefits from low correlation across the
+    sub-strategies — the mean-reversion overlay smooths the trend
+    drawdowns.
+  indicators_used:
+    - name: see_sub_strategies
+      lookback_period: "per sub-strategy"
+      formula_reference: "Each sub-strategy's own indicator stack"
+      applied_to: "per sub-strategy"
+  entry_price: per_sub_strategy
+  entry_time: "Per sub-strategy"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: capital_allocation_across_sub_strategies
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Per sub-strategy within its capital slice"
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+    sub_strategy_weights:
+      clenow_stocks_on_the_move_v1: 0.40
+      clenow_te_global_macro_momentum_v1: 0.40
+      clenow_te_counter_trend_v1: 0.20
+  scaling_rules: "Re-balance allocations monthly to target weights"
+  max_concurrent_positions: "Sum of sub-strategy maxima"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Per sub-strategy"
+  trailing_stop: None
+  signal_reversal: "Per sub-strategy"
+  exit_priority: "Per sub-strategy"
+  exit_price: "Per sub-strategy"
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Sub-strategies chosen for low cross-correlation; weights reflect this"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: "Union across sub-strategies"
+  data_frequency: daily
+  minimum_history_required: "Max of sub-strategy minimums"
+  benchmark: "60/40 SPY/IEF"
+  starting_capital: 100000
+  commission_assumption: "Per sub-strategy"
+  slippage_assumption: "Per sub-strategy"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book"
+  test_universe: "Combined"
+  cagr: "Author reports the combined portfolio outperforms each sub-strategy alone on Sharpe"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Reduced relative to any single sub-strategy"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Used as the book's capstone — demonstrates how diversification of strategies improves risk-adjusted returns."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Equal weight (33/33/33)"
+  - "Risk-parity weight (inversely proportional to vol)"
+  - "Adaptive weights based on rolling Sharpe"
+  - "Add carver_carry_v1 as a fourth uncorrelated leg"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - This is a *portfolio* strategy. To backtest, run each sub-strategy
+    independently within its capital slice, then combine equity curves.
+  - Cash is re-allocated monthly to maintain target weights.
+  - Drift between months is acceptable; no continuous rebalancing.
+look_ahead_bias_warnings: "Per sub-strategy."
+survivorship_bias_warnings: "Per sub-strategy."
+data_snooping_warnings: "Allocation weights (40/40/20) are illustrative; risk-parity is a more principled choice."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_stocks_on_the_move_v1
+  - clenow_te_global_macro_momentum_v1
+  - clenow_te_counter_trend_v1
+  - carver_vol_target_overlay_v1
+prerequisites: |
+  Constituent sub-strategies must be independently implemented and tested
+  before combination.

@@ -1,0 +1,142 @@
+strategy_id: alvarez_country_etf_rotation_v1
+name: "Country ETF Rotation with Bond Fallback"
+author: Cesar Alvarez
+
+source:
+  type: blog_post
+  title: "Country ETF Rotation"
+  chapter_or_url: "https://alvarezquanttrading.com/blog/country-etf-rotation/"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: dual_momentum_rotation_with_safe_asset
+asset_class: [etfs]
+specific_instruments: |
+  Country ETFs (e.g., EWA, EWC, EWG, EWH, EWI, EWJ, EWL, EWM, EWO, EWP, EWQ,
+  EWS, EWT, EWU, EWY, EWZ, EZA, INDA, FXI, RSX, EFA, IEMG, EEM)
+  + Safe asset: IEF (7-10 Year Treasury) or SHY
+timeframe: monthly
+holding_period_typical: "1 month minimum, possibly multiple months if held"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Liquid global country ETFs as listed in `specific_instruments`. Author's exact list is documented in the blog post; the universe above is representative."
+liquidity_filter: "ETF AUM and average daily volume sufficient for retail trading"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    On the last trading day of each month at the close:
+    1. For each country ETF, compute:
+       - return_6m  = (close / close[126]) - 1     (6 months ≈ 126 trading days)
+       - return_12m = (close / close[252]) - 1     (12 months ≈ 252 trading days)
+    2. Rank ETFs descending by return_6m. Identify the top 2 by 6m return.
+    3. For each of the top 2 candidates, check the safety filter:
+       - close > SMA(close, 126)  (6-month SMA)
+       AND
+       - close > SMA(close, 252)  (12-month SMA)
+    4. If a candidate fails the safety filter, replace it with IEF for that
+       slot. (i.e., 0, 1, or 2 of the slots may be IEF.)
+    5. Buy the resulting two positions at the next session's open
+       (first trading day of the new month).
+  indicators_used:
+    - name: ROC
+      lookback_period: 126
+      formula_reference: "(close[t] / close[t-126]) - 1"
+      applied_to: close
+    - name: ROC
+      lookback_period: 252
+      formula_reference: "(close[t] / close[t-252]) - 1"
+      applied_to: close
+    - name: SMA
+      lookback_period: 126
+      formula_reference: simple
+      applied_to: close
+    - name: SMA
+      lookback_period: 252
+      formula_reference: simple
+      applied_to: close
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new month, at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 50    # 100% / 2 names
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 2
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Re-rank monthly; rotate out of any position not in the top 2 next month"
+  trailing_stop: None
+  signal_reversal: "Per-month re-evaluation"
+  exit_priority: "Time stop only"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Bond fallback (IEF) substitution provides per-name regime filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "252 bars per ETF for 12-month metrics"
+  benchmark: "60% SPY / 40% IEF or equal-weight country ETFs"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps per fill"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1/1/2007 – 12/31/2016 in original post"
+  test_universe: "Country ETF list"
+  cagr: ">10% with the bond fallback"
+  sharpe: NOT_SPECIFIED
+  max_dd: "<30% with bond fallback"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Without the bond-fallback rule, the strategy fails the author's CAR>10% / MDD<30% target."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use only 6m moving average filter (drop 12m)"
+  - "Use SHY instead of IEF as safety asset"
+  - "Top 3 names instead of 2"
+  - "Combine 6m and 12m return ranks (rank-of-ranks)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Author tests both 6m and 12m moving averages as the safety filter.
+    Default to 'either filter fail → fallback to IEF' (logical OR on failure)
+    based on the post's CAR-improving variation.
+  - 'Last trading day of month' is straightforward; month-end calendar
+    convention applies.
+look_ahead_bias_warnings: |
+  - Use signal on EOM close, fill at next session open. Some implementations
+    naively fill at EOM close — reasonable approximation but not strictly
+    live-tradable.
+survivorship_bias_warnings: "Some country ETFs were delisted; backtest must include delisted history."
+data_snooping_warnings: "126/252-day windows are conventional; sweep robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - alvarez_etf_sector_rotation_v1
+  - alvarez_three_factor_etf_rotation_v1
+  - alvarez_etf_bond_rotation_v1
+prerequisites: None

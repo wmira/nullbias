@@ -1,0 +1,120 @@
+strategy_id: longmore_turn_of_month_v1
+name: "Turn-of-Month Equity Effect"
+author: Kris Longmore (Robot Wealth)
+
+source:
+  type: blog_post
+  title: "Robot Wealth turn-of-month research; bootcamp materials"
+  chapter_or_url: "robotwealth.com bootcamp"
+  publication_year: 2020
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: seasonal
+sub_category: turn_of_month_equity
+asset_class: [etfs]
+specific_instruments: "SPY, QQQ, major equity indexes"
+timeframe: daily
+holding_period_typical: "5-7 trading days around month-end"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Major US equity ETFs"
+liquidity_filter: "High liquidity"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Documented anomaly: equity returns are concentrated around
+    the turn-of-month period (last few trading days + first few of
+    new month).
+
+    Trade rule:
+    1. Calculate days-to-month-end for each trading day.
+    2. ENTER LONG at close of T-3 (3 trading days before month-end).
+    3. EXIT at close of T+3 (3 trading days into new month).
+
+    Window length tunable: T-2 to T+4 also works; longer windows dilute
+    the concentrated effect.
+
+    Logic: institutional rebalancing (pension fund flows, mutual fund
+    inflows, dividend reinvestment) creates predictable buying pressure.
+  indicators_used:
+    - name: trading_day_of_month
+      lookback_period: 1
+      formula_reference: "Count of trading days from start/end of month using exchange calendar"
+      applied_to: "calendar"
+  entry_price: close_signal_bar
+  entry_time: "Close of T-3"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: full_cash_during_window
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 100
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Close of T+3 (mandatory)"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Time stop"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Optional: skip months when SPY < 200-SMA"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "Multi-year for stability"
+  benchmark: "Buy-and-hold SPY"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "5 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade documented in academic literature"
+  test_universe: "SPY"
+  cagr: "Window captures disproportionate share of monthly returns; positive standalone"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Lower than buy-and-hold (only invested ~30% of trading days)"
+  win_rate: "60-65% of months positive in TOM window"
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "12 per year"
+  notes: "Effect has weakened post-2010 but remains marginally positive. Best as portfolio diversifier rather than standalone strategy."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different windows (T-1 to T+1 / T-5 to T+5)"
+  - "Trade only 'first 4 trading days' of month"
+  - "Apply to international indexes"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Trading-day-of-month counted via exchange calendar (NYSE).
+  - Window endpoints inclusive vs exclusive: document choice.
+look_ahead_bias_warnings: "Calendar-based; no look-ahead."
+survivorship_bias_warnings: "Negligible (index ETFs)."
+data_snooping_warnings: "Window length is the main tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - kaufman_seasonal_v1
+  - chan_seasonal_futures_v1
+prerequisites: None

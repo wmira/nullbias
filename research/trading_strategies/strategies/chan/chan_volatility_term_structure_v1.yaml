@@ -1,0 +1,136 @@
+strategy_id: chan_volatility_term_structure_v1
+name: "Volatility Term Structure Trade (VIX/VXX)"
+author: Ernest Chan
+
+source:
+  type: blog_post
+  title: "Mean reversion, momentum, and volatility term structure"
+  chapter_or_url: "http://epchan.blogspot.com/2016/04/mean-reversion-momentum-and-volatility.html"
+  publication_year: 2016
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: volatility_term_structure
+asset_class: [etfs]
+specific_instruments: "VIX index (signal); VXX/VIXY (long vol ETN); SVXY/XIV (short vol ETN, where available); SPY (alternative hedge)"
+timeframe: daily
+holding_period_typical: "Days to weeks"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "VIX-based volatility ETFs (VXX as primary) and S&P 500 futures/ETFs"
+liquidity_filter: "VXX is highly liquid; XIV was delisted in Feb 2018"
+fundamental_filter: NOT_SPECIFIED
+exclusions: "XIV is no longer tradable; use SVXY (-0.5x) as inverse-vol substitute"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Daily evaluation at the close:
+
+    1. Compute term structure slope:
+         tsr = VIX / VXV - 1     (or VIX / 3-month constant-maturity VIX)
+       where VXV is 93-day VIX (CBOE 3-month VIX).
+       tsr > 0 → backwardation (front spot higher than 3m, panicked)
+       tsr < 0 → contango (front spot lower than 3m, normal)
+
+    2. Trade rules:
+         If tsr > 0 (backwardation):
+           Long VXX (volatility expected to rise further)
+           Or pair: long VXX, short SPY
+         If tsr < 0 (contango):
+           Short VXX (volatility ETF will decay due to roll cost)
+           Or long SVXY (inverse)
+
+    3. Optional: only act when |tsr| exceeds a threshold (e.g., > 0.05
+       or < -0.05) to avoid noise trades.
+
+    Logic: VIX futures roll cost is the main P&L driver of VXX. In contango,
+    VXX leaks ~10% per month from roll. Short VXX (or long SVXY) captures
+    this premium.
+  indicators_used:
+    - name: VIX_VXV_ratio
+      lookback_period: "Point-in-time"
+      formula_reference: "VIX / VXV - 1"
+      applied_to: "VIX and VXV index closes"
+  entry_price: close_signal_bar
+  entry_time: "End-of-day"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 25  # Volatility products are extremely volatile
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Smaller than typical equity position due to vol-product extreme moves"
+  max_concurrent_positions: 1
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: "Optional: 25% adverse move on VXX (vol products can move 50%+ in days)"
+  time_stop: NOT_SPECIFIED
+  trailing_stop: None
+  signal_reversal: "Position flips on tsr sign change"
+  exit_priority: "Sign reversal → stop loss"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Volatility events cause severe short-vol drawdowns; consider hard cap"
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "VXX inception 2009; VXV inception 2007"
+  benchmark: "VXX buy-and-hold (extreme negative drift) or cash"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10-20 bps for vol ETNs"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Various since 2009 (VXX inception)"
+  test_universe: "VXX, SVXY, XIV (pre-2018)"
+  cagr: "Substantial returns short-vol in normal regimes"
+  sharpe: NOT_SPECIFIED
+  max_dd: |
+    SEVERE — Feb 2018 'volmageddon' wiped out XIV (>90% loss in one day)
+    March 2020 caused major drawdowns in short-vol positions
+  win_rate: "High in normal periods (~70%+ contango)"
+  avg_win_loss_ratio: "Wins small (daily theta), losses huge (vol spikes)"
+  num_trades: NOT_SPECIFIED
+  notes: "Chan emphasises this is a 'collecting pennies in front of a steamroller' strategy. Position sizing must account for tail risk."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Pair vol with SPY (long vol when backward, short SPY)"
+  - "Use VIX futures directly (front month) instead of VXX"
+  - "Combine with SPX put protection"
+  - "Add VRP overlay (long VIX when realized > implied)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - VXV was renamed to VIX3M; same series. VIX9D, VIX, VIX3M, VIX6M
+    available for richer term structure analysis.
+  - SVXY changed leverage from -1x to -0.5x in March 2018 after the
+    XIV blow-up. Backtests must account for this.
+  - VXX has rolled into VXX-II (different ticker post-2018).
+look_ahead_bias_warnings: "Same-day close fills assumed; live execution requires intraday."
+survivorship_bias_warnings: "Major — XIV no longer exists. Backtests using XIV pre-2018 are not realistic for OOS deployment."
+data_snooping_warnings: |
+  - Tail-risk events (Feb 2018, Mar 2020) make backtest stats deceiving.
+    Stress-test with crisis scenarios.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - connors_vix_rsi_v1
+  - carver_carry_v1
+prerequisites: "Volatility-product trading authorization"

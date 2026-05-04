@@ -1,0 +1,135 @@
+strategy_id: lopez_de_prado_cscv_v1
+name: "Combinatorially Symmetric Cross-Validation (CSCV) for Backtest Overfit Detection"
+author: Marcos López de Prado
+
+source:
+  type: paper
+  title: "The Probability of Backtest Overfitting"
+  chapter_or_url: "SSRN paper; Advances in Financial Machine Learning Chapter 11-12"
+  publication_year: 2014
+  page_or_section: "Chapters 11-12"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: backtest_validation_overfit_detection
+asset_class: [equities, etfs, futures]
+specific_instruments: "Any underlying strategy"
+timeframe: daily
+holding_period_typical: "N/A — methodology"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Defined by underlying strategy"
+liquidity_filter: NOT_SPECIFIED
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Methodology to estimate the PROBABILITY OF BACKTEST OVERFITTING (PBO).
+
+    Procedure:
+    1. Generate N parameter configurations of a strategy (e.g., 10,000
+       combinations of moving-average periods, RSI thresholds, etc.).
+    2. Compute trade-by-trade returns for each configuration on full
+       history → matrix M of size T (timestamps) × N (configurations).
+    3. Split T into S non-overlapping submatrices of equal length
+       (S typically 16).
+    4. For all C(S, S/2) ways to partition the S sub-matrices into
+       half "in-sample" and half "out-of-sample":
+         a. Concatenate IS sub-matrices for each configuration
+         b. Concatenate OOS sub-matrices for each configuration
+         c. Identify n* = arg max IS Sharpe (the "best" config in IS)
+         d. Compute OOS Sharpe rank of n* among all N configs
+         e. Record relative rank ω̄_n* = OOS_rank / N
+    5. PBO = Pr(ω̄ < median) = fraction of partitions where the IS-best
+       config performed below median OOS.
+
+    Interpretation:
+      PBO < 0.5 → IS optimization generalises (low overfit)
+      PBO > 0.5 → IS-best is no better than random in OOS (overfit)
+
+    Use as a HARD CRITERION for whether to deploy a strategy.
+  indicators_used:
+    - name: cscv_partition_search
+      lookback_period: "Full history"
+      formula_reference: "Combinatorial enumeration of S/2 from S sub-matrices; O(2^S) — manageable for S≤20"
+      applied_to: "configuration × time matrix of returns"
+  entry_price: per_underlying_strategy
+  entry_time: per_underlying_strategy
+
+# === POSITION SIZING ===
+position_sizing:
+  method: per_underlying_strategy
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "CSCV is a validation method — informs deployment decision but doesn't size"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: per_underlying_strategy
+  stop_loss: per_underlying_strategy
+  time_stop: per_underlying_strategy
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: per_underlying_strategy
+  exit_price: per_underlying_strategy
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: NOT_SPECIFIED
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: per_underlying
+  data_frequency: per_underlying
+  minimum_history_required: "Enough bars to support S sub-matrices (e.g., S=16 → 16 chunks of meaningful length)"
+  benchmark: "Per underlying"
+  starting_capital: NOT_SPECIFIED
+  commission_assumption: "Per underlying"
+  slippage_assumption: "Per underlying"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Demonstrated in book"
+  test_universe: "Various"
+  cagr: NOT_SPECIFIED
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Author's central claim: most published trading strategies have
+    PBO > 0.5 — they don't generalise OOS. CSCV provides a rigorous
+    way to estimate this BEFORE deploying capital.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Different S values (8, 16, 32) — bigger S more thorough, more compute"
+  - "Sample-based PBO (random subsampling instead of full combinatorial)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - S=16 → C(16, 8) = 12,870 partitions; tractable.
+  - S=20 → C(20, 10) = 184,756 partitions; pushing.
+  - For very large parameter spaces, use random subset of partitions.
+look_ahead_bias_warnings: "Strict IS/OOS split per partition; no look-ahead."
+survivorship_bias_warnings: "Per underlying."
+data_snooping_warnings: |
+  - CSCV is specifically designed to MEASURE data-snooping effects;
+    it doesn't eliminate them, just quantifies their severity.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - bandy_walk_forward_overlay_v1
+  - bandy_monte_carlo_validation_v1
+prerequisites: "Multi-configuration parameter search over strategy"

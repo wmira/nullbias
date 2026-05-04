@@ -1,0 +1,111 @@
+# =============================================================================
+# Trading Strategy Specification — canonical schema
+# Per project spec. Every per-strategy YAML must populate every field below.
+# Use NOT_SPECIFIED if the author left a field blank, AND record a sensible
+# default in `ambiguities_and_assumptions` with justification.
+# =============================================================================
+
+strategy_id:                    # <author_lastname>_<short_name>_<version>, e.g. connors_rsi2_v1
+name:                           # Original published name
+author:                         # Full name
+
+source:
+  type:                         # book | blog_post | paper | podcast | interview
+  title:                        # Source title
+  chapter_or_url:               # Specific location (chapter, URL, page)
+  publication_year:             # YYYY
+  page_or_section:              # If book
+
+# === STRATEGY METADATA ===
+category:                       # mean_reversion | trend_following | momentum | factor | volatility | options | pairs | event_driven | seasonal
+sub_category:                   # e.g., overnight_drift, gap_fade, dual_momentum
+asset_class:                    # [equities, etfs, futures, options, fx, crypto, bonds]
+specific_instruments:           # e.g., "SPY, QQQ, IWM" or "S&P 500 stocks above $5"
+timeframe:                      # intraday_Xmin | daily | weekly | monthly
+holding_period_typical:         # e.g., "2-5 days", "until exit signal"
+direction:                      # long_only | short_only | long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  <Exact rules for security selection>
+liquidity_filter:               # Specific thresholds
+fundamental_filter:             # If any
+exclusions:                     # e.g., "exclude earnings week"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    <Numbered list of ALL conditions, exact parameters>
+  indicators_used:
+    - name:                     # e.g., RSI
+      lookback_period:          # e.g., 2
+      formula_reference:        # Wilder's smoothing | simple | EMA | etc.
+      applied_to:               # close | high | adjusted_close | etc.
+  entry_price:                  # market_open_next_bar | close_signal_bar | limit_at_X
+  entry_time:                   # e.g., "next day at open", "intraday on signal"
+
+# === POSITION SIZING ===
+position_sizing:
+  method:                       # fixed_dollar | fixed_pct_equity | volatility_targeted | kelly | equal_weight | risk_parity
+  parameters:
+    risk_per_trade_pct:
+    max_position_pct:
+    volatility_target:
+    atr_multiple:
+  scaling_rules:                # pyramiding | scale-in tranches | none
+  max_concurrent_positions:     # integer or "unlimited"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target:                # None | rule
+  stop_loss:                    # None | rule
+  time_stop:                    # None | "exit after N bars"
+  trailing_stop:                # None | specifics
+  signal_reversal:              # None | specifics
+  exit_priority:                # Order in which exits are evaluated
+  exit_price:                   # market_close | next_open | limit
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker:
+  market_regime_filter:         # e.g., "only trade if SPY > 200-SMA"
+  correlation_limits:
+  sector_concentration_limits:
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:         # [open, high, low, close, volume, ...]
+  data_frequency:               # daily | minute | tick
+  minimum_history_required:     # e.g., "200 bars for SMA warmup"
+  benchmark:                    # SPY | author-specified
+  starting_capital:             # author's example or default $100k
+  commission_assumption:
+  slippage_assumption:
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period:                  # YYYY-YYYY
+  test_universe:
+  cagr:
+  sharpe:
+  max_dd:
+  win_rate:
+  avg_win_loss_ratio:
+  num_trades:
+  notes:
+
+# === KNOWN VARIATIONS ===
+variations:
+  - <variation 1>
+  - <variation 2>
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  <Any place where author was unclear and the assumption made.>
+look_ahead_bias_warnings:
+survivorship_bias_warnings:
+data_snooping_warnings:
+
+# === RELATED STRATEGIES ===
+related_strategy_ids: []
+prerequisites:

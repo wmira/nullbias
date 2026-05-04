@@ -1,0 +1,147 @@
+strategy_id: clenow_stocks_on_move_long_short_v1
+name: "Stocks on the Move — Long/Short Variant"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Stocks on the Move"
+  chapter_or_url: "Long/short variant chapter; followingthetrend.com discussions"
+  publication_year: 2015
+  page_or_section: "Long/short discussion"
+
+# === STRATEGY METADATA ===
+category: momentum
+sub_category: equity_momentum_long_short
+asset_class: [equities]
+specific_instruments: "S&P 500 constituents (point-in-time)"
+timeframe: weekly
+holding_period_typical: "Weeks to months"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "S&P 500 stocks with point-in-time membership"
+liquidity_filter: "Implicit via S&P 500"
+fundamental_filter: "S&P 500 inclusion"
+exclusions: "Same gap filter as canonical SOM (>15% single-day gap in last 90 days)"
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Weekly evaluation. Same momentum_score as clenow_stocks_on_the_move_v1
+    (annualised exp regression slope × R²).
+
+    LONG leg:
+      1. Top 20% momentum_score
+      2. close > SMA(close, 100)
+      3. No gap > 15% in last 90 days
+      ⇒ Buy.
+
+    SHORT leg:
+      1. Bottom 20% momentum_score
+      2. close < SMA(close, 100)
+      3. No gap > 15% in last 90 days
+      ⇒ Short.
+
+    No SPY 200-SMA filter on the long-short variant — the cross-sectional
+    construction provides regime neutrality.
+
+    Net dollar exposure approximately zero (equal $ long and short).
+  indicators_used:
+    - name: SMA
+      lookback_period: 100
+      formula_reference: simple
+      applied_to: close
+    - name: exponential_regression_slope
+      lookback_period: 90
+      formula_reference: "OLS log(close) ~ time; annualised slope = exp(b * 252) - 1"
+      applied_to: "log(close)"
+    - name: R_squared
+      lookback_period: 90
+      formula_reference: "Coefficient of determination of the regression"
+      applied_to: "regression residuals"
+    - name: ATR
+      lookback_period: 20
+      formula_reference: "Wilder ATR(20)"
+      applied_to: high_low_close
+  entry_price: market_open_next_bar
+  entry_time: "Wednesday open after Tuesday close evaluation"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: atr_risk_parity_long_short
+  parameters:
+    risk_per_trade_pct: 0.001
+    max_position_pct: NOT_SPECIFIED
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: |
+    shares[i] = (portfolio_value × 0.001) / ATR(close[i], 20)
+    Long leg total $ ≈ short leg total $ (dollar-neutral)
+  max_concurrent_positions: "Limited by available capital and top/bottom 20% eligibility"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: |
+    Long sells if any of:
+    - Drops out of top 20% momentum
+    - close < SMA(close, 100)
+    Short covers if any of:
+    - Drops out of bottom 20% momentum
+    - close > SMA(close, 100)
+  exit_priority: "Any trigger fires"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: "Cross-sectional construction is intrinsically regime-neutral"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close, volume]
+  data_frequency: daily
+  minimum_history_required: "200 bars + 90 regression"
+  benchmark: "0% return (cash) or HFRX equity-market-neutral index"
+  starting_capital: 100000
+  commission_assumption: "$0.005/share"
+  slippage_assumption: "5-10 bps per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1999-2014 in original book"
+  test_universe: "S&P 500 with point-in-time membership"
+  cagr: "Author reports modest absolute returns but better Sharpe than long-only SOM in down regimes"
+  sharpe: NOT_SPECIFIED
+  max_dd: "Reduced relative to long-only — particularly in 2008"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: "Short side is harder to monetise after borrow costs; author flags this as an important real-world friction."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Long top 10% / short bottom 10% (more concentrated)"
+  - "Add SPY 200-SMA gating on long leg only (asymmetric)"
+  - "Use inverse ETFs (SH) instead of unlevered shorts"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Borrow availability and short-fee modeling are critical for this
+    variant; idealised backtests overstate returns.
+  - Dollar-neutral construction maintained at each rebalance.
+  - Same momentum-score formula as canonical SOM.
+look_ahead_bias_warnings: "Tuesday close compute, Wednesday open fill."
+survivorship_bias_warnings: "Material — point-in-time S&P 500 essential, especially for shorts (delisted names)."
+data_snooping_warnings: "Same as canonical SOM."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_stocks_on_the_move_v1
+  - carver_relmomentum_v1
+prerequisites: None

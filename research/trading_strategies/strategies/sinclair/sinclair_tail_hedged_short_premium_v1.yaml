@@ -1,0 +1,138 @@
+strategy_id: sinclair_tail_hedged_short_premium_v1
+name: "Tail-Hedged Short Premium Structure"
+author: Euan Sinclair
+
+source:
+  type: book
+  title: "Volatility Trading / Positional Option Trading"
+  chapter_or_url: "Risk management chapters"
+  publication_year: 2013
+  page_or_section: "Tail risk management chapters"
+
+# === STRATEGY METADATA ===
+category: volatility
+sub_category: short_premium_with_tail_hedge
+asset_class: [options]
+specific_instruments: "Liquid index options (SPX, SPY)"
+timeframe: monthly
+holding_period_typical: "30-45 days"
+direction: short_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "SPX/SPY index options"
+liquidity_filter: "Tight bid-ask"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Standard short-premium with explicit downside tail hedge.
+
+    Per-cycle structure (~45 DTE):
+    A) Income leg — short premium:
+       - Short 16-delta strangle (call + put) OR
+       - Short 30-delta put cash-secured
+
+    B) Tail hedge leg:
+       - LONG further-OTM puts (e.g., 5-delta or 3-delta)
+       - Maturity: same as income leg OR longer (3-6 months)
+       - Quantity: 2-3× the short-strangle put quantity for proper
+         tail coverage
+
+    Net structure:
+       Net credit = strangle credit - tail hedge cost
+       Reduced credit vs naked strangle, but capped downside in
+       severe vol-spike events.
+
+    Sinclair's framing: small portion of the VRP is given up to buy
+    insurance against tail events. Net Sharpe higher than naked
+    short premium because of reduced drawdown.
+  indicators_used:
+    - name: option_delta
+      lookback_period: 1
+      formula_reference: "Black-Scholes delta at chosen strikes"
+      applied_to: "option chain"
+    - name: IV_Rank
+      lookback_period: 252
+      formula_reference: "(current IV - 52wk min) / (52wk max - 52wk min)"
+      applied_to: "IV history"
+  entry_price: combo_credit_limit_order
+  entry_time: "Monthly cycle"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: bp_per_position_capped
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 5
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Hedge ratio (long puts / short puts) typically 2-3:1"
+  max_concurrent_positions: NOT_SPECIFIED
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: "50% of net credit"
+  stop_loss: "Tail hedge limits max loss; explicit stop optional"
+  time_stop: "21 DTE management"
+  trailing_stop: None
+  signal_reversal: NOT_SPECIFIED
+  exit_priority: "PT → 21 DTE"
+  exit_price: combo_debit_limit_order
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: "Tail hedge IS the circuit breaker"
+  market_regime_filter: "IV Rank > 50 entry filter"
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "option chain history"
+    - "underlying"
+  data_frequency: daily
+  minimum_history_required: "5+ years including vol-spike events"
+  benchmark: "Naked short strangle / CBOE PUT"
+  starting_capital: 100000
+  commission_assumption: "Per-contract × 4+ legs"
+  slippage_assumption: "1-2 cents per leg"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade SPX"
+  test_universe: "SPX/SPY"
+  cagr: "Lower than naked short premium in normal regimes; HIGHER over full cycle inclusive of crashes"
+  sharpe: "Materially higher than naked short premium"
+  max_dd: "Significantly capped vs naked"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    Tail-hedged short premium is Sinclair's recommended structure
+    for retail / non-institutional traders. Forgo some upside for
+    survivability — the 2008/2018/2020 events teach this lesson.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "1:1 hedge ratio (cheaper, less protection)"
+  - "Calendar-spread tail hedge (long longer-dated puts)"
+  - "Black swan portfolio overlay (separate strategy)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Hedge ratio sizing: 2-3:1 long-put-to-short-put is heuristic;
+    optimal hedge is event-distribution dependent.
+  - Tail hedge maturity: same-cycle is simpler; longer-cycle provides
+    persistent protection at cost of theta drag.
+look_ahead_bias_warnings: "Standard."
+survivorship_bias_warnings: "Negligible (index)."
+data_snooping_warnings: "Hedge ratio tunable."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - sinclair_variance_risk_premium_v1
+  - sinclair_iv_rv_gap_v1
+prerequisites: "Spreads-level options trading; ability to manage 4+ legs"

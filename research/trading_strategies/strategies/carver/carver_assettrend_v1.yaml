@@ -1,0 +1,134 @@
+strategy_id: carver_assettrend_v1
+name: "Asset-Class Trend (Cross-Sectional EWMAC Demeaned by Asset Class)"
+author: Robert Carver
+
+source:
+  type: blog_post
+  title: "Some more trading rules / pysystemtrade `assettrend` rule"
+  chapter_or_url: "https://qoppac.blogspot.com/2017/06/some-more-trading-rules.html ; AFTS Strategies 21-22"
+  publication_year: 2017
+  page_or_section: NOT_SPECIFIED
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: cross_sectional_trend
+asset_class: [futures]
+specific_instruments: "Diversified futures, organised into asset-class buckets (rates, FX, equities, energy, metals, ags)"
+timeframe: daily
+holding_period_typical: "Weeks; turnover ~6× per year"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified futures with explicit asset-class membership"
+liquidity_filter: "Standard cost filter"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Cross-sectional version of EWMAC: each instrument's trend forecast is
+    measured relative to the average forecast of its asset class.
+
+    1. For each instrument, compute EWMAC(L_fast, L_slow) raw forecast as in
+       carver_ewmac_X_Y_v1. Default speeds: (16, 64) — but the rule is
+       parameterised across the EWMAC family.
+    2. For each asset-class bucket, compute the cross-sectional mean of
+       raw forecasts of all instruments in that bucket at bar t:
+         mean_forecast_bucket = mean(raw_forecast[i] for i in bucket)
+    3. demeaned_forecast[i] = raw_forecast[i] - mean_forecast_bucket
+    4. forecast = demeaned_forecast × asset_trend_scalar
+       asset_trend_scalar ≈ same as the underlying EWMAC scalar (e.g., 4.10
+       for (16,64))
+    5. capped_forecast = clip(forecast, -20, +20)
+
+    Effect: long instruments trending UP relative to their asset class;
+    short instruments trending DOWN relative to their asset class.
+    Removes the directional/beta exposure of vanilla trend.
+  indicators_used:
+    - name: EWMAC_raw
+      lookback_period: "(16, 64) default; parameterisable"
+      formula_reference: "Same vol-normalised EWMAC as carver_ewmac_16_64_v1, but BEFORE multiplying by forecast_scalar"
+      applied_to: close
+    - name: asset_class_mean
+      lookback_period: "Same period as EWMAC"
+      formula_reference: "Cross-sectional mean of raw_forecast across asset-class members at bar t"
+      applied_to: "raw EWMAC forecast cross-section"
+  entry_price: close_signal_bar
+  entry_time: "Continuous"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: volatility_targeted_continuous_forecast
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Function of forecast"
+    volatility_target: "User-defined"
+    atr_multiple: NOT_SPECIFIED
+    forecast_scalar: "≈ 4.10 for the (16,64) variant"
+    forecast_cap: 20.0
+  scaling_rules: "Continuous"
+  max_concurrent_positions: "All instruments — but net exposure within each asset class is approximately zero"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: None
+  signal_reversal: "Continuous"
+  exit_priority: "Continuous resizing"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Lower than directional EWMAC because cross-sectional"
+  sector_concentration_limits: "Net zero by construction within asset-class"
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [close]
+  data_frequency: daily
+  minimum_history_required: "Same as underlying EWMAC speed (e.g., 64 bars + 25 vol)"
+  benchmark: "Long-only diversified futures / Carver system"
+  starting_capital: "$100k+"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade per Carver's tests"
+  test_universe: "Diversified futures with asset-class taxonomy"
+  cagr: NOT_SPECIFIED
+  sharpe: "Standalone modest, but lowly correlated with vanilla EWMAC — adds diversification"
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "~6 round-trips per instrument per year (similar to underlying EWMAC speed)"
+  notes: NOT_SPECIFIED
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Use EWMAC(8,32) or (32,128) as base"
+  - "Demean across the entire universe instead of within asset class"
+  - "Apply rank-based instead of mean-demean"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Asset-class taxonomy is the implementation choice — Carver's
+    pysystemtrade defines: equity, vol, bond, fx, ags, metals, energy.
+  - 'Demean' here means subtract the simple cross-sectional mean.
+    Some variants z-score; default to mean-demean.
+  - Forecast scalar approximation: applied AFTER demeaning, calibrated
+    to give average |forecast| = 10 over the cross-section.
+look_ahead_bias_warnings: "Cross-sectional mean uses concurrent bar t for all instruments — no look-ahead within-day."
+survivorship_bias_warnings: "Asset-class membership must be point-in-time correct."
+data_snooping_warnings: "Asset-class bucket definitions are choices."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_ewmac_16_64_v1
+  - carver_relmomentum_v1
+prerequisites: "Volatility-target overlay; instrument-to-asset-class mapping"

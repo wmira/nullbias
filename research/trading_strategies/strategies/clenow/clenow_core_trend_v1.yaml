@@ -1,0 +1,158 @@
+strategy_id: clenow_core_trend_v1
+name: "Core CTA Trend (Following the Trend)"
+author: Andreas Clenow
+
+source:
+  type: book
+  title: "Following the Trend: Diversified Managed Futures Trading"
+  chapter_or_url: "Core trend-following strategy chapter; Wiley 2nd ed 2022; followingthetrend.com 'Trading System Rules' page"
+  publication_year: 2013
+  page_or_section: "Trading System Rules section"
+
+# === STRATEGY METADATA ===
+category: trend_following
+sub_category: donchian_breakout_with_atr_stop
+asset_class: [futures]
+specific_instruments: |
+  Diversified futures across asset classes (Clenow's typical CTA universe):
+  - equity index futures (ES, NQ, FESX, NK, HSI)
+  - rates (US, TY, FGBL, JGB)
+  - FX futures (6E, 6J, 6B, 6A, 6C, 6S)
+  - metals (GC, SI, HG, PL)
+  - energy (CL, NG, HO, RB)
+  - agriculturals (ZC, ZS, ZW, KC, SB, CT, CC)
+timeframe: daily
+holding_period_typical: "Weeks to months — variable trend duration"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Diversified liquid futures contracts across asset classes; typical CTA universe of 30-60 instruments"
+liquidity_filter: "Sufficient daily volume for retail-sized trading; Clenow uses ~50 of the most-liquid global futures"
+fundamental_filter: NOT_SPECIFIED
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Long entry at the close of bar t if ALL of the following are true:
+    1. close(t) > rolling_max(close, 50)[t-1]
+       (today's close exceeds the previous 50-day rolling high — i.e., a
+        new 50-day breakout)
+    2. EMA(close, 50)[t] > EMA(close, 100)[t]
+       (50-EMA above 100-EMA — confirmation that the medium-term trend
+        is up)
+    3. No long position currently open in this instrument
+
+    Short entry — symmetric:
+    1. close(t) < rolling_min(close, 50)[t-1]
+    2. EMA(close, 50)[t] < EMA(close, 100)[t]
+    3. No short position currently open
+
+    Note: The book also documents an alternative simpler entry of just
+    50-day breakout without the EMA filter; the EMA-confirmed variant
+    is the recommended canonical version.
+  indicators_used:
+    - name: rolling_max
+      lookback_period: 50
+      formula_reference: "max(close) over the prior 50 bars (EXCLUSIVE of bar t)"
+      applied_to: close
+    - name: rolling_min
+      lookback_period: 50
+      formula_reference: "min(close) over the prior 50 bars (EXCLUSIVE of bar t)"
+      applied_to: close
+    - name: EMA
+      lookback_period: 50
+      formula_reference: "Exponential MA: alpha = 2/(N+1), span=50"
+      applied_to: close
+    - name: EMA
+      lookback_period: 100
+      formula_reference: "EMA span=100"
+      applied_to: close
+    - name: ATR
+      lookback_period: 100
+      formula_reference: "Average True Range, 100-day Wilder ATR"
+      applied_to: high_low_close
+  entry_price: close_signal_bar
+  entry_time: "End-of-day fill at close, or next-day open as conservative variant"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: atr_volatility_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: "Sized so that 1×ATR(100) move contributes ~20 bps to portfolio P&L (i.e., position_size = 0.002 × portfolio_value / ATR(100))"
+    volatility_target: "20 bps per instrument per ATR-day move (Clenow's published default)"
+    atr_multiple: 1.0
+  scaling_rules: none
+  max_concurrent_positions: "All instruments where signal is true"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: None
+  trailing_stop: "3 × ATR(100) trailing stop from highest close since entry (long) / lowest close since entry (short). Update daily."
+  signal_reversal: "Optional: exit on opposite-side breakout signal"
+  exit_priority: "Trailing stop is sole exit"
+  exit_price: close_signal_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "100 bars (max of EMA-100 and ATR-100)"
+  benchmark: "BTOP50 CTA index"
+  starting_capital: "$1M+ for diversified futures portfolio (or use leverage / micro contracts at retail size)"
+  commission_assumption: "Per-contract; sometimes modeled as 1 round-turn cost per signal"
+  slippage_assumption: "1 bid-ask spread"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1990-2012 in original book; 1990-2022 in 2nd edition"
+  test_universe: "~50 diversified futures"
+  cagr: "Author reports ~15-20% gross CAGR with ~25% volatility on the diversified portfolio"
+  sharpe: "Author claims ~0.5-0.8 Sharpe over multi-decade test"
+  max_dd: "Significant — typical CTA drawdowns 25-40%"
+  win_rate: "Low — typical 30-40% trade win rate (compensated by large winners)"
+  avg_win_loss_ratio: "High — winners average ~3-5× losers"
+  num_trades: NOT_SPECIFIED
+  notes: "Strategy designed to mimic the CTA industry. Performance closely tracks BTOP50 index over multi-year periods."
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Drop the EMA(50) > EMA(100) filter (simpler 50-day breakout)"
+  - "Use 100-day breakout + 200-day EMA filter (slower variant)"
+  - "Use ATR(20) instead of ATR(100) for sizing"
+  - "Add 200-day SMA filter for entries"
+  - "Long-only variant for risk-averse traders"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Breakout convention: a NEW high means today's close > max of past 50
+    closes EXCLUSIVE of today. Some implementations use INCLUSIVE — that
+    creates a same-bar circular signal.
+  - ATR period: Clenow's text uses 100-day in the canonical version.
+    Some Python implementations default to 20-day; difference matters
+    materially for position sizing on low-vol instruments.
+  - Wilder's ATR convention: TR averaged with smoothing factor 1/N.
+look_ahead_bias_warnings: "Close-of-day signal with close-of-day fill is a same-bar fill assumption. Use T+1 open for live trading."
+survivorship_bias_warnings: "Negligible (futures with proper roll handling)."
+data_snooping_warnings: |
+  - 50/100 day windows are conventional but not optimised.
+  - 3 ATR stop is a common round number; sensitivity to 2 ATR vs 4 ATR
+    is meaningful.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - clenow_ftt_diversified_breakout_v1
+  - clenow_te_simple_trend_v1
+  - carver_ewmac_16_64_v1
+  - carver_breakout_80_v1
+prerequisites: None

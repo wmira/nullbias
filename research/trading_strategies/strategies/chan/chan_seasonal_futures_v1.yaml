@@ -1,0 +1,147 @@
+strategy_id: chan_seasonal_futures_v1
+name: "Seasonal Patterns in Commodity Futures"
+author: Ernest Chan
+
+source:
+  type: book
+  title: "Algorithmic Trading: Winning Strategies and Their Rationale"
+  chapter_or_url: "Seasonality chapter; epchan.blogspot.com posts"
+  publication_year: 2013
+  page_or_section: "Seasonality chapter"
+
+# === STRATEGY METADATA ===
+category: seasonal
+sub_category: commodity_calendar_seasonality
+asset_class: [futures]
+specific_instruments: |
+  Commodity futures with documented seasonality:
+  - Natural gas (NG) — winter heating demand drives Nov-Mar strength
+  - Heating oil (HO) — similar winter pattern
+  - Gasoline (RB) — summer driving demand drives May-Aug strength
+  - Corn / soybeans / wheat (ZC, ZS, ZW) — planting/harvest cycles
+  - Cotton, sugar, coffee — agricultural cycles
+timeframe: daily
+holding_period_typical: "Weeks to months — held over the seasonal window"
+direction: long_short
+
+# === UNIVERSE & FILTERS ===
+universe_definition: "Commodity futures with documented seasonal patterns"
+liquidity_filter: "Liquid for retail futures trading"
+fundamental_filter: "Pattern must have clear physical-economy driver"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    For each commodity with a documented seasonal pattern:
+
+    1. Identify the seasonal long-side window (months when the commodity
+       has historically rallied)
+       Example for natural gas: Nov 1 — Feb 28
+    2. Identify seasonal short-side window
+       Example for natural gas: Mar 15 — Sep 15
+
+    3. Daily check:
+       - On the first trading day of the long-side window: open long
+       - On the first trading day of the short-side window: open short
+       - Outside both windows: flat
+
+    4. Strength filter (optional, Chan's variant):
+       Only trade if the prior 5-year average return over this same
+       calendar window (computed on a rolling basis) is at least 5%
+       in the expected direction.
+
+    5. Realised-statistics filter (optional):
+       Only trade if the historical Sharpe of this seasonal trade over
+       the prior 10 years > 0.5 — guards against patterns that have
+       broken down.
+  indicators_used:
+    - name: calendar_date
+      lookback_period: 1
+      formula_reference: "Calendar month and day; entry/exit dates fixed per commodity"
+      applied_to: "calendar"
+    - name: rolling_seasonal_mean_return
+      lookback_period: "5-10 prior years"
+      formula_reference: "Average return over the same calendar window in each prior year"
+      applied_to: "futures returns"
+  entry_price: market_at_open_or_close
+  entry_time: "First trading day of seasonal window"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: fixed_pct_equity_or_atr_targeted
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 10
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: "Optional: ATR-based sizing per Carver / Clenow style"
+  max_concurrent_positions: "Multiple commodities simultaneously"
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: NOT_SPECIFIED
+  stop_loss: "Optional: 2 × ATR(20)"
+  time_stop: "Last trading day of seasonal window — MANDATORY"
+  trailing_stop: None
+  signal_reversal: None
+  exit_priority: "Time stop is dominant; optional ATR stop overrides if hit first"
+  exit_price: market_at_close
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: "Multiple commodities can be correlated (e.g., NG, HO both winter-strong); diversify across asset classes"
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields: [open, high, low, close]
+  data_frequency: daily
+  minimum_history_required: "10 years for stable seasonal pattern detection"
+  benchmark: "Cash"
+  starting_capital: "$100k+ for futures"
+  commission_assumption: "Per-contract"
+  slippage_assumption: "1 spread per round-trip"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "Multi-decade in book examples"
+  test_universe: "NG, HO, RB, ag commodities"
+  cagr: "Modest standalone returns; works best as portfolio diversifier"
+  sharpe: NOT_SPECIFIED
+  max_dd: NOT_SPECIFIED
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: "Few — 2 trades per commodity per year"
+  notes: |
+    Chan warns that seasonal patterns can break down due to structural
+    changes (e.g., shale gas changed natural gas seasonality after 2010).
+    Pattern stability check is critical.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "Spread trades within same commodity (e.g., long NG winter, short summer)"
+  - "Multi-commodity baskets (long all winter-strong commodities)"
+  - "Add momentum confirmation (only enter if commodity is already trending in expected direction)"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - Specific entry/exit dates documented per commodity in seasonality
+    references (e.g., commodityseasonals.com); user must source these.
+  - Continuous-contract roll handling matters for futures backtests.
+  - Pattern-stability check is essential; older patterns may have
+    structurally broken.
+look_ahead_bias_warnings: "Calendar dates known in advance; no look-ahead at signal time."
+survivorship_bias_warnings: "Use commodity history including periods when patterns existed and didn't."
+data_snooping_warnings: |
+  - Selecting commodities with strong historical patterns is itself
+    survivorship bias. Test on full commodity universe to avoid
+    cherry-picking.
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - carver_carry_v1
+  - clenow_te_curve_trading_v1
+prerequisites: "Futures trading; calendar of seasonal patterns"

@@ -1,0 +1,134 @@
+strategy_id: gray_ebit_ev_value_v1
+name: "Pure EBIT/EV Cheapness Decile"
+author: Wesley Gray (Alpha Architect)
+
+source:
+  type: book
+  title: "Quantitative Value (Cheapness chapter)"
+  chapter_or_url: "QV book Cheapness chapter; alphaarchitect.com posts on the topic"
+  publication_year: 2012
+  page_or_section: "Cheapness chapter"
+
+# === STRATEGY METADATA ===
+category: factor
+sub_category: pure_cheapness_deep_value
+asset_class: [equities]
+specific_instruments: "US large- and mid-cap stocks"
+timeframe: monthly
+holding_period_typical: "12 months (annual rebalance)"
+direction: long_only
+
+# === UNIVERSE & FILTERS ===
+universe_definition: |
+  Stocks meeting:
+  - Listed on NYSE/AMEX/NASDAQ
+  - Market cap above 40th percentile of NYSE breakpoint
+  - Excludes financials and utilities
+liquidity_filter: "Mid-cap or larger"
+fundamental_filter: "Excludes financials and utilities"
+exclusions: NOT_SPECIFIED
+
+# === ENTRY RULES ===
+entry_signal:
+  trigger_conditions: |
+    Annual screening process:
+
+    1. Compute EBIT / EV for every stock in the eligible universe.
+       EBIT = trailing 12-month operating income
+       EV = market_cap + total_debt - cash_and_equivalents
+    2. Rank descending (highest yield = cheapest = rank 1).
+    3. Select stocks in the cheapest decile (top 10% by EBIT/EV).
+    4. Equal-weight.
+    5. Hold for 12 months, re-rank.
+
+    No quality, momentum, or trend overlay — pure cheapness.
+  indicators_used:
+    - name: EBIT_EV
+      lookback_period: "TTM"
+      formula_reference: "trailing_12mo_EBIT / (market_cap + total_debt - cash)"
+      applied_to: "fundamentals"
+  entry_price: market_open_next_bar
+  entry_time: "First trading day of new period at open"
+
+# === POSITION SIZING ===
+position_sizing:
+  method: equal_weight
+  parameters:
+    risk_per_trade_pct: NOT_SPECIFIED
+    max_position_pct: 1  # ~1% per name in 100-name decile portfolio
+    volatility_target: NOT_SPECIFIED
+    atr_multiple: NOT_SPECIFIED
+  scaling_rules: none
+  max_concurrent_positions: 100
+
+# === EXIT RULES ===
+exit_rules:
+  profit_target: None
+  stop_loss: None
+  time_stop: "Annual re-rank"
+  trailing_stop: None
+  signal_reversal: "Per-rebalance"
+  exit_priority: "Time stop"
+  exit_price: market_open_next_bar
+
+# === RISK MANAGEMENT ===
+portfolio_level_rules:
+  max_drawdown_circuit_breaker: NOT_SPECIFIED
+  market_regime_filter: None
+  correlation_limits: NOT_SPECIFIED
+  sector_concentration_limits: NOT_SPECIFIED
+
+# === BACKTEST REQUIREMENTS ===
+backtest_specs:
+  required_data_fields:
+    - "fundamentals"
+    - "market data"
+  data_frequency: "Quarterly fundamentals; daily prices"
+  minimum_history_required: "1 year of fundamentals"
+  benchmark: "S&P 500 / Russell 1000 Value"
+  starting_capital: 100000
+  commission_assumption: "$0 retail"
+  slippage_assumption: "10 bps"
+
+# === REPORTED PERFORMANCE ===
+author_reported_results:
+  test_period: "1964-2011 in QV book"
+  test_universe: "US large+mid cap"
+  cagr: "Author reports ~16% CAGR for top decile vs ~10% for S&P 500"
+  sharpe: NOT_SPECIFIED
+  max_dd: "High — typical deep-value drawdowns 50%+ in 2008"
+  win_rate: NOT_SPECIFIED
+  avg_win_loss_ratio: NOT_SPECIFIED
+  num_trades: NOT_SPECIFIED
+  notes: |
+    The QV book's surprising finding: this naked cheapness rule
+    OUTPERFORMS the Magic Formula's two-factor combination by ~2% per
+    year. Adding quality filters DOES reduce drawdowns but at the cost
+    of some return. The full QV strategy adds quality + forensic
+    filters specifically to reduce tail risk.
+
+# === KNOWN VARIATIONS ===
+variations:
+  - "EBITDA/EV instead of EBIT/EV"
+  - "FCF/EV (free cash flow yield)"
+  - "Gross Profit / EV (Novy-Marx style)"
+  - "Top quintile (20%) instead of decile"
+  - "Top 50 names instead of full decile"
+
+# === IMPLEMENTATION NOTES ===
+ambiguities_and_assumptions: |
+  - EBIT vs Operating Income: technically EBIT excludes non-operating
+    items; some implementations use Operating Income (includes some
+    non-operating items). Difference small in practice.
+  - 'Cash' in EV calculation: typically includes short-term investments
+    too. Document the choice.
+look_ahead_bias_warnings: "Use lagged fundamentals (3-month delay)."
+survivorship_bias_warnings: "Material — must use point-in-time membership and include delisted names."
+data_snooping_warnings: "Top decile is conventional; sweep top quintile / quartile for robustness."
+
+# === RELATED STRATEGIES ===
+related_strategy_ids:
+  - gray_quant_value_v1
+  - gray_qval_etf_v1
+  - gray_magic_formula_v1
+prerequisites: None
